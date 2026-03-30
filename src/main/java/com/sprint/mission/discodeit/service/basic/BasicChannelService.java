@@ -42,8 +42,6 @@ public class BasicChannelService implements ChannelService {
     public ChannelDto create(PublicChannelCreateRequest request) {
         String name = request.name();
         String description = request.description();
-        log.info("공개 채널 생성 시작: name = {}", name);
-
         Channel channel = new Channel(ChannelType.PUBLIC, name, description);
 
         channelRepository.save(channel);
@@ -55,7 +53,6 @@ public class BasicChannelService implements ChannelService {
     @Override
     public ChannelDto create(PrivateChannelCreateRequest request) {
 
-        log.info("비공개 채널 생성 시작");
         Channel channel = new Channel(ChannelType.PRIVATE, null, null);
         channelRepository.save(channel);
 
@@ -95,7 +92,6 @@ public class BasicChannelService implements ChannelService {
     public ChannelDto update(UUID channelId, PublicChannelUpdateRequest request) {
         String newName = request.newName();
         String newDescription = request.newDescription();
-        log.info("채널 수정 시작: channelId = {}", channelId);
 
         Channel channel = channelRepository.findById(channelId)
                 .orElseThrow(
@@ -105,7 +101,7 @@ public class BasicChannelService implements ChannelService {
                         });
         if (channel.getType().equals(ChannelType.PRIVATE)) {
             log.warn("채널 수정 실패 - 비공개 채널은 수정할 수 없음: channelId = {}", channelId);
-            throw new PrivateChannelUpdateNotAllowedException();
+            throw new PrivateChannelUpdateNotAllowedException(channelId);
         }
         channel.update(newName, newDescription);
 
@@ -116,10 +112,9 @@ public class BasicChannelService implements ChannelService {
     @Transactional
     @Override
     public void delete(UUID channelId) {
-        log.info("채널 삭제 시작: channelId = {}", channelId);
 
         if (!channelRepository.existsById(channelId)) {
-            log.warn("채널 삭제 실패 - 존재하지 않는 채널 Id: channelId={}", channelId);
+            log.warn("채널 삭제 실패 - 존재하지 않는 채널 Id: channelId = {}", channelId);
             throw new ChannelNotFoundException(channelId);
         }
 
@@ -127,5 +122,6 @@ public class BasicChannelService implements ChannelService {
         readStatusRepository.deleteAllByChannelId(channelId);
 
         channelRepository.deleteById(channelId);
+        log.info("채널 삭제 완료: channelId = {}", channelId);
     }
 }

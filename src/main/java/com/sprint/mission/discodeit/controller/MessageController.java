@@ -16,6 +16,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Pageable;
@@ -46,10 +47,10 @@ public class MessageController implements MessageApi {
 
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<MessageDto> create(
-            @RequestPart("messageCreateRequest") MessageCreateRequest messageCreateRequest,
+            @Valid @RequestPart("messageCreateRequest") MessageCreateRequest messageCreateRequest,
             @RequestPart(value = "attachments", required = false) List<MultipartFile> attachments
     ) {
-        log.info("메시지 생성 요청 시작: channelId = {}, authorId = {}",
+        log.info("메시지 생성 요청 : channelId = {}, authorId = {}",
                 messageCreateRequest.channelId(), messageCreateRequest.authorId());
         List<BinaryContentCreateRequest> attachmentRequests = Optional.ofNullable(attachments)
                 .map(files -> files.stream()
@@ -61,13 +62,12 @@ public class MessageController implements MessageApi {
                                         file.getBytes()
                                 );
                             } catch (IOException e) {
-                                throw new BinaryContentStorageException();
+                                throw new BinaryContentStorageException("readMultipart", "messageAttachment");
                             }
                         })
                         .toList())
                 .orElse(new ArrayList<>());
         MessageDto createdMessage = messageService.create(messageCreateRequest, attachmentRequests);
-        log.info("메시지 생성 요청 완료: messageId = {}", createdMessage.id());
         return ResponseEntity
                 .status(HttpStatus.CREATED)
                 .body(createdMessage);
@@ -75,20 +75,18 @@ public class MessageController implements MessageApi {
 
     @PatchMapping(path = "{messageId}")
     public ResponseEntity<MessageDto> update(@PathVariable("messageId") UUID messageId,
-                                             @RequestBody MessageUpdateRequest request) {
-        log.info("메시지 수정 요청 시작: messageId = {}", messageId);
+                                             @Valid @RequestBody MessageUpdateRequest request) {
+        log.info("메시지 수정 요청 : messageId = {}", messageId);
         MessageDto updatedMessage = messageService.update(messageId, request);
-        log.info("메시지 수정 요청 완료: messageId = {}", updatedMessage.id());
         return ResponseEntity
                 .status(HttpStatus.OK)
                 .body(updatedMessage);
     }
 
     @DeleteMapping(path = "{messageId}")
-    public ResponseEntity<Void> delete(@PathVariable("messageId") UUID messageId) {
-        log.info("메시지 삭제 요청 시작: messageId = {}", messageId);
+    public ResponseEntity<Void> delete(@PathVariable UUID messageId) {
+        log.info("메시지 삭제 요청 : messageId = {}", messageId);
         messageService.delete(messageId);
-        log.info("메시지 삭제 요청 완료: messageId = {}", messageId);
         return ResponseEntity
                 .status(HttpStatus.NO_CONTENT)
                 .build();

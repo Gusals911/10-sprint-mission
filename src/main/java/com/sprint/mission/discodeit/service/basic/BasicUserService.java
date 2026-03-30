@@ -34,7 +34,6 @@ import org.springframework.transaction.annotation.Transactional;
 public class BasicUserService implements UserService {
 
     private final UserRepository userRepository;
-    private final UserStatusRepository userStatusRepository;
     private final UserMapper userMapper;
     private final BinaryContentRepository binaryContentRepository;
     private final BinaryContentStorage binaryContentStorage;
@@ -45,14 +44,13 @@ public class BasicUserService implements UserService {
                           Optional<BinaryContentCreateRequest> optionalProfileCreateRequest) {
         String username = userCreateRequest.username();
         String email = userCreateRequest.email();
-        log.info("회원 가입 로직 시작: username = {}, email = {}", username, email);
 
         if (userRepository.existsByEmail(email)) {
-            log.warn("회원 가입 실패 - 이메일 중복: email = {}", email);
+            log.warn("사용자 생성 실패 - 이메일 중복: email = {}", email);
             throw new DuplicatedEmailException(email);
         }
         if (userRepository.existsByUsername(username)) {
-            log.warn("회원 가입 실패 - 유저명 중복: username = {}", username);
+            log.warn("사용자 생성 실패 - 유저명 중복: username = {}", username);
             throw new DuplicatedUsernameException(username);
         }
 
@@ -77,7 +75,7 @@ public class BasicUserService implements UserService {
         UserStatus userStatus = new UserStatus(user, now);
 
         userRepository.save(user);
-        log.info("회원 가입 로직 완료: userId = {}, username = {}", user.getId(), user.getUsername());
+        log.info("사용자 생성 로직 완료: userId = {}, username = {}", user.getId(), user.getUsername());
         return userMapper.toDto(user);
     }
 
@@ -102,16 +100,15 @@ public class BasicUserService implements UserService {
                           Optional<BinaryContentCreateRequest> optionalProfileCreateRequest) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new UserNotFoundException(userId));
-        log.info("회원 수정 로직 시작: userId = {}, username = {}", user.getId(), user.getUsername());
 
         String newUsername = userUpdateRequest.newUsername();
         String newEmail = userUpdateRequest.newEmail();
         if (userRepository.existsByEmail(newEmail)) {
-            log.warn("회원 수정 실패 - 이메일 중복: email = {}", newEmail);
+            log.warn("사용자 수정 실패 - 이메일 중복: email = {}", newEmail);
             throw new DuplicatedEmailException(newEmail);
         }
         if (userRepository.existsByUsername(newUsername)) {
-            log.warn("회원 수정 실패 - 유저명 중복: username = {}", newUsername);
+            log.warn("사용자 수정 실패 - 유저명 중복: username = {}", newUsername);
             throw new DuplicatedUsernameException(newUsername);
         }
 
@@ -133,7 +130,7 @@ public class BasicUserService implements UserService {
 
         String newPassword = userUpdateRequest.newPassword();
         user.update(newUsername, newEmail, newPassword, nullableProfile);
-        log.info("회원 수정 로직 완료: newUsername = {}, newEmail = {}", newUsername, newEmail);
+        log.info("사용자 수정 로직 완료: newUsername = {}, newEmail = {}", newUsername, newEmail);
 
         return userMapper.toDto(user);
     }
@@ -142,10 +139,10 @@ public class BasicUserService implements UserService {
     @Override
     public void delete(UUID userId) {
         if (!userRepository.existsById(userId)) {
-            log.warn("회원 삭제 실패 - 존재하지 않는 유저 Id: userId = {}", userId);
+            log.warn("사용자 삭제 실패 - 존재하지 않는 유저 Id: userId = {}", userId);
             throw new UserNotFoundException(userId);
         }
         userRepository.deleteById(userId);
-        log.info("회원 삭제 성공: userId = {}", userId);
+        log.info("사용자 삭제 완료: userId = {}", userId);
     }
 }
