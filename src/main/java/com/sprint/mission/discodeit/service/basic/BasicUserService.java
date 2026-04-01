@@ -35,6 +35,7 @@ public class BasicUserService implements UserService {
 
     private final UserRepository userRepository;
     private final UserMapper userMapper;
+    private final UserStatusRepository userStatusRepository;
     private final BinaryContentRepository binaryContentRepository;
     private final BinaryContentStorage binaryContentStorage;
 
@@ -74,6 +75,7 @@ public class BasicUserService implements UserService {
         Instant now = Instant.now();
         UserStatus userStatus = new UserStatus(user, now);
 
+        userStatusRepository.save(userStatus);
         userRepository.save(user);
         log.info("사용자 생성 로직 완료: userId = {}, username = {}", user.getId(), user.getUsername());
         return userMapper.toDto(user);
