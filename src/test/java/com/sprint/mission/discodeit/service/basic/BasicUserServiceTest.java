@@ -3,6 +3,7 @@ package com.sprint.mission.discodeit.service.basic;
 import com.sprint.mission.discodeit.dto.data.UserDto;
 import com.sprint.mission.discodeit.dto.request.BinaryContentCreateRequest;
 import com.sprint.mission.discodeit.dto.request.UserCreateRequest;
+import com.sprint.mission.discodeit.dto.request.UserUpdateRequest;
 import com.sprint.mission.discodeit.entity.BinaryContent;
 import com.sprint.mission.discodeit.entity.User;
 import com.sprint.mission.discodeit.entity.UserStatus;
@@ -155,6 +156,65 @@ public class BasicUserServiceTest {
 
         then(binaryContentStorage).should().put(savedBinaryContent.getId(), tempProfile.bytes());
 
+    }
+
+    // 프로필 포함 수정 성공
+    @Test
+    @DisplayName("프로필을 포함한 유저 수정을 검증한다.")
+    void update_with_profile_success() {
+        // given
+        ArgumentCaptor<BinaryContent> binaryContentCaptor = ArgumentCaptor.forClass(BinaryContent.class);
+
+        UUID userId = UUID.randomUUID();
+        UserUpdateRequest request = new UserUpdateRequest("mung", "mung@naver.com", "12345678");
+        BinaryContentCreateRequest tempProfile = new BinaryContentCreateRequest("profile", "image", "test".getBytes());
+        Optional<BinaryContentCreateRequest> profile = Optional.of(tempProfile);
+        User user = new User("gusals", "gusals@naver.com", "1234", null);
+        UserDto expected = new UserDto(userId, "mung", "mung@naver.com", null, false );
+
+        given(userRepository.findById(userId)).willReturn(Optional.of(user));
+        given(userRepository.existsByEmail(request.newEmail())).willReturn(false);
+        given(userRepository.existsByUsername(request.newUsername())).willReturn(false);
+        given(userMapper.toDto(any())).willReturn(expected);
+
+        // when
+        UserDto result = basicUserService.update(userId, request, profile);
+
+        // then
+        then(userRepository).should().findById(userId);
+        then(userRepository).should().existsByEmail(request.newEmail());
+        then(userRepository).should().existsByUsername(request.newUsername());
+        then(binaryContentRepository).should().save(binaryContentCaptor.capture());
+
+        BinaryContent savedBinaryContent = binaryContentCaptor.getValue();
+
+        assertThat(result).isEqualTo(expected);
+        assertThat(user.getUsername()).isEqualTo("mung");
+        assertThat(user.getEmail()).isEqualTo("mung@naver.com");
+        assertThat(user.getPassword()).isEqualTo("12345678");
+        assertThat(user.getProfile()).isEqualTo(savedBinaryContent);
+
+        then(userMapper).should().toDto(user);
+        then(binaryContentStorage).should().put(savedBinaryContent.getId(), tempProfile.bytes());
+    }
+
+    // 유저 삭제 성공
+    @Test
+    @DisplayName("유저 삭제를 검증한다.")
+    void delete_success() {
+        // given
+        UUID userId = UUID.randomUUID();
+
+        given(userRepository.existsById(userId)).willReturn(true);
+
+        // when
+        Throwable result = catchThrowable(() -> basicUserService.delete(userId));
+
+        // then
+        assertThat(result).doesNotThrowAnyException();
+
+        then(userRepository).should().existsById(userId);
+        then(userRepository).should().deleteById(userId);
     }
 
 }

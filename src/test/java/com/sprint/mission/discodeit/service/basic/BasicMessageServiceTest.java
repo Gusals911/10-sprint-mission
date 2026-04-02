@@ -3,6 +3,8 @@ package com.sprint.mission.discodeit.service.basic;
 import com.sprint.mission.discodeit.dto.data.MessageDto;
 import com.sprint.mission.discodeit.dto.request.BinaryContentCreateRequest;
 import com.sprint.mission.discodeit.dto.request.MessageCreateRequest;
+import com.sprint.mission.discodeit.dto.request.MessageUpdateRequest;
+import com.sprint.mission.discodeit.dto.response.PageResponse;
 import com.sprint.mission.discodeit.entity.BinaryContent;
 import com.sprint.mission.discodeit.entity.Channel;
 import com.sprint.mission.discodeit.entity.ChannelType;
@@ -22,6 +24,10 @@ import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Slice;
+import org.springframework.data.domain.SliceImpl;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
@@ -130,5 +136,90 @@ public class BasicMessageServiceTest {
         assertThat(savedMessage.getAttachments()).contains(savedBinaryContent);
 
         then(binaryContentStorage).should().put(savedBinaryContent.getId(), tempAttachment.bytes());
+    }
+
+    // 채널별 메시지 조회 성공
+    @Test
+    @DisplayName("채널별 메시지 목록 조회를 검증한다.")
+    void find_all_by_channel_id_success() {
+        // given
+        UUID channelId = UUID.randomUUID();
+        Instant cursor = Instant.parse("2026-04-02T10:00:00Z");
+        Pageable pageable = PageRequest.of(0, 2);
+        Channel channel = new Channel(ChannelType.PUBLIC, "backend", "backend channel");
+        User author = new User("gusals", "gusals@naver.com", "1234", null);
+        Message firstMessage = new Message("first", channel, author, List.of());
+        Message secondMessage = new Message("second", channel, author, List.of());
+        MessageDto firstExpected = new MessageDto(UUID.randomUUID(), Instant.parse("2026-04-02T09:58:00Z"),
+                Instant.parse("2026-04-02T09:58:00Z"), "first", channelId, null, List.of());
+        MessageDto secondExpected = new MessageDto(UUID.randomUUID(), Instant.parse("2026-04-02T09:57:00Z"),
+                Instant.parse("2026-04-02T09:57:00Z"), "second", channelId, null, List.of());
+        Slice<Message> slice = new SliceImpl<>(List.of(firstMessage, secondMessage), pageable, true);
+        PageResponse<MessageDto> expected = new PageResponse<>(List.of(firstExpected, secondExpected),
+                secondExpected.createdAt(), pageable.getPageSize(), true, null);
+
+        given(messageRepository.findAllByChannelIdWithAuthor(channelId, cursor, pageable)).willReturn(slice);
+        given(messageMapper.toDto(firstMessage)).willReturn(firstExpected);
+        given(messageMapper.toDto(secondMessage)).willReturn(secondExpected);
+        given(pageResponseMapper.fromSlice(org.mockito.ArgumentMatchers.<Slice<MessageDto>>any(),
+                eq(secondExpected.createdAt()))).willReturn(expected);
+
+        // when
+        PageResponse<MessageDto> result = basicMessageService.findAllByChannelId(channelId, cursor, pageable);
+
+        // then
+        assertThat(result).isEqualTo(expected);
+
+        then(messageRepository).should().findAllByChannelIdWithAuthor(channelId, cursor, pageable);
+        then(messageMapper).should().toDto(firstMessage);
+        then(messageMapper).should().toDto(secondMessage);
+        then(pageResponseMapper).should().fromSlice(org.mockito.ArgumentMatchers.<Slice<MessageDto>>any(),
+                eq(secondExpected.createdAt()));
+    }
+
+    // 메시지 수정 성공
+    @Test
+    @DisplayName("메시지 수정을 검증한다.")
+    void update_success() {
+        // given
+        UUID messageId = UUID.randomUUID();
+        MessageUpdateRequest request = new MessageUpdateRequest("updated");
+        Channel channel = new Channel(ChannelType.PUBLIC, "backend", "backend channel");
+        User author = new User("gusals", "gusals@naver.com", "1234", null);
+        Message message = new Message("hello", channel, author, List.of());
+        MessageDto expected = new MessageDto(messageId, Instant.now(), Instant.now(), "updated",
+                UUID.randomUUID(), null, List.of());
+
+        given(messageRepository.findById(messageId)).willReturn(Optional.of(message));
+        given(messageMapper.toDto(any())).willReturn(expected);
+
+        // when
+        MessageDto result = basicMessageService.update(messageId, request);
+
+        // then
+        assertThat(result).isEqualTo(expected);
+        assertThat(message.getContent()).isEqualTo("updated");
+
+        then(messageRepository).should().findById(messageId);
+        then(messageMapper).should().toDto(message);
+    }
+
+    // 메시지 삭제 성공
+    @Test
+    @DisplayName("메시지 삭제를 검증한다.")
+    void delete_success() {
+        // given
+        UUID messageId = UUID.randomUUID();
+
+        given(messageRepository.existsById(messageId)).willReturn(true);
+
+        // when
+        Throwable result = catchThrowable(() -> basicMessageService.delete(messageId));
+
+        // then
+        assertThat(result).doesNotThrowAnyException();
+
+        then(messageRepository).should().existsById(messageId);
+        then(messageRepository).should().deleteById(messageId);
     }
 }

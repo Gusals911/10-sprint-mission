@@ -3,6 +3,7 @@ package com.sprint.mission.discodeit.service.basic;
 import com.sprint.mission.discodeit.dto.data.ChannelDto;
 import com.sprint.mission.discodeit.dto.request.PrivateChannelCreateRequest;
 import com.sprint.mission.discodeit.dto.request.PublicChannelCreateRequest;
+import com.sprint.mission.discodeit.dto.request.PublicChannelUpdateRequest;
 import com.sprint.mission.discodeit.entity.Channel;
 import com.sprint.mission.discodeit.entity.ChannelType;
 import com.sprint.mission.discodeit.entity.ReadStatus;
@@ -117,5 +118,84 @@ public class BasicChannerServiceTest {
                 .containsOnly(savedChannel);
 
         then(channelMapper).should().toDto(savedChannel);
+    }
+
+    // 유저별 채널 조회 성공
+    @Test
+    @DisplayName("유저가 참여한 채널 목록 조회를 검증한다.")
+    void find_all_by_user_id_success() {
+        // given
+        UUID userId = UUID.randomUUID();
+        User user = new User("gusals", "gusals@naver.com", "1234", null);
+        Channel privateChannel = new Channel(ChannelType.PRIVATE, null, null);
+        Channel publicChannel = new Channel(ChannelType.PUBLIC, "backend", "backend channel");
+        ReadStatus readStatus = new ReadStatus(user, privateChannel, privateChannel.getCreatedAt());
+        ChannelDto firstExpected = new ChannelDto(UUID.randomUUID(), ChannelType.PUBLIC, "backend",
+                "backend channel", null, null);
+        ChannelDto secondExpected = new ChannelDto(UUID.randomUUID(), ChannelType.PRIVATE, null, null, null, null);
+
+        given(readStatusRepository.findAllByUserId(userId)).willReturn(List.of(readStatus));
+        given(channelRepository.findAllByTypeOrIdIn(eq(ChannelType.PUBLIC), anyList()))
+                .willReturn(List.of(publicChannel, privateChannel));
+        given(channelMapper.toDto(publicChannel)).willReturn(firstExpected);
+        given(channelMapper.toDto(privateChannel)).willReturn(secondExpected);
+
+        // when
+        List<ChannelDto> result = basicChannelService.findAllByUserId(userId);
+
+        // then
+        assertThat(result).containsExactly(firstExpected, secondExpected);
+
+        then(readStatusRepository).should().findAllByUserId(userId);
+        then(channelRepository).should().findAllByTypeOrIdIn(eq(ChannelType.PUBLIC), anyList());
+        then(channelMapper).should().toDto(publicChannel);
+        then(channelMapper).should().toDto(privateChannel);
+    }
+
+    // 공개 채널 수정 성공
+    @Test
+    @DisplayName("공개 채널 수정을 검증한다.")
+    void update_public_channel_success() {
+        // given
+        UUID channelId = UUID.randomUUID();
+        PublicChannelUpdateRequest request = new PublicChannelUpdateRequest("frontend", "frontend channel");
+        Channel channel = new Channel(ChannelType.PUBLIC, "backend", "backend channel");
+        ChannelDto expected = new ChannelDto(channelId, ChannelType.PUBLIC, "frontend",
+                "frontend channel", null, null);
+
+        given(channelRepository.findById(channelId)).willReturn(java.util.Optional.of(channel));
+        given(channelMapper.toDto(any())).willReturn(expected);
+
+        // when
+        ChannelDto result = basicChannelService.update(channelId, request);
+
+        // then
+        assertThat(result).isEqualTo(expected);
+        assertThat(channel.getName()).isEqualTo("frontend");
+        assertThat(channel.getDescription()).isEqualTo("frontend channel");
+
+        then(channelRepository).should().findById(channelId);
+        then(channelMapper).should().toDto(channel);
+    }
+
+    // 채널 삭제 성공
+    @Test
+    @DisplayName("채널 삭제를 검증한다.")
+    void delete_success() {
+        // given
+        UUID channelId = UUID.randomUUID();
+
+        given(channelRepository.existsById(channelId)).willReturn(true);
+
+        // when
+        Throwable result = catchThrowable(() -> basicChannelService.delete(channelId));
+
+        // then
+        assertThat(result).doesNotThrowAnyException();
+
+        then(channelRepository).should().existsById(channelId);
+        then(messageRepository).should().deleteAllByChannelId(channelId);
+        then(readStatusRepository).should().deleteAllByChannelId(channelId);
+        then(channelRepository).should().deleteById(channelId);
     }
 }
