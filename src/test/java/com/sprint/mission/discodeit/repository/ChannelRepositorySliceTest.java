@@ -19,15 +19,16 @@ import static org.assertj.core.api.Assertions.assertThat;
 @ActiveProfiles("test")
 @EnableJpaAuditing
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
-class ChannelRepositorySliceTest {
+public class ChannelRepositorySliceTest {
 
   @Autowired
   private ChannelRepository channelRepository;
   @Autowired
   private TestEntityManager entityManager;
 
+  // public, private 채널 조건 조회 성공
   @Test
-  @DisplayName("findAllByTypeOrIdIn returns public channels and selected private channels")
+  @DisplayName("public 채널과 선택된 private 채널 조회를 검증한다.")
   void find_all_by_type_or_id_in_success() {
     // given
     Channel publicChannel = persistChannel(ChannelType.PUBLIC, "backend", "backend channel");
@@ -50,8 +51,9 @@ class ChannelRepositorySliceTest {
         );
   }
 
+  // public, private 채널 조건 조회 실패
   @Test
-  @DisplayName("findAllByTypeOrIdIn returns only public channels when private ids do not match")
+  @DisplayName("일치하는 private 채널이 없으면 public 채널만 반환한다.")
   void find_all_by_type_or_id_in_fail() {
     // given
     Channel publicChannel = persistChannel(ChannelType.PUBLIC, "backend", "backend channel");

@@ -28,7 +28,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 @ActiveProfiles("test")
 @EnableJpaAuditing
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
-class MessageRepositorySliceTest {
+public class MessageRepositorySliceTest {
 
   @Autowired
   private MessageRepository messageRepository;
@@ -43,8 +43,9 @@ class MessageRepositorySliceTest {
   @Autowired
   private JdbcTemplate jdbcTemplate;
 
+  // 채널별 메시지 슬라이스 조회 성공
   @Test
-  @DisplayName("findAllByChannelIdWithAuthor returns a paged slice before the cursor")
+  @DisplayName("cursor 이전 메시지 슬라이스 조회를 검증한다.")
   void find_all_by_channel_id_with_author_success() {
     // given
     Channel channel = persistChannel();
@@ -76,8 +77,9 @@ class MessageRepositorySliceTest {
     assertThat(result.getContent().get(1).getId()).isNotEqualTo(oldest.getId());
   }
 
+  // 채널별 메시지 슬라이스 조회 실패
   @Test
-  @DisplayName("findAllByChannelIdWithAuthor returns an empty slice when nothing matches")
+  @DisplayName("조건에 맞는 메시지가 없으면 빈 슬라이스를 반환한다.")
   void find_all_by_channel_id_with_author_fail() {
     // given
     Channel channel = persistChannel();
@@ -97,8 +99,9 @@ class MessageRepositorySliceTest {
     assertThat(result.hasNext()).isFalse();
   }
 
+  // 채널의 마지막 메시지 시간 조회 성공
   @Test
-  @DisplayName("findLastMessageAtByChannelId returns the latest createdAt")
+  @DisplayName("채널의 마지막 메시지 시간 조회를 검증한다.")
   void find_last_message_at_by_channel_id_success() {
     // given
     Channel channel = persistChannel();
@@ -115,8 +118,9 @@ class MessageRepositorySliceTest {
     assertThat(result).contains(Instant.parse("2026-04-05T10:03:00Z"));
   }
 
+  // 채널의 마지막 메시지 시간 조회 실패
   @Test
-  @DisplayName("findLastMessageAtByChannelId returns empty when the channel has no messages")
+  @DisplayName("채널에 메시지가 없으면 빈 값을 반환한다.")
   void find_last_message_at_by_channel_id_fail() {
     // given
     Channel channel = persistChannel();

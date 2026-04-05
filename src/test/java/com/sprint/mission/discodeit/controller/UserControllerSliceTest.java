@@ -17,6 +17,7 @@ import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.ResultActions;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
@@ -29,7 +30,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @WebMvcTest(UserController.class)
 @ActiveProfiles("test")
-class UserControllerSliceTest {
+public class UserControllerSliceTest {
 
   @Autowired
   private MockMvc mockMvc;
@@ -41,8 +42,9 @@ class UserControllerSliceTest {
   @MockitoBean
   private UserStatusService userStatusService;
 
+  // 유저 생성 성공
   @Test
-  @DisplayName("create returns the created user as JSON")
+  @DisplayName("유저 생성 응답 JSON을 검증한다.")
   void create_success() throws Exception {
     // given
     UUID userId = UUID.randomUUID();
@@ -64,10 +66,13 @@ class UserControllerSliceTest {
 
     given(userService.create(any(), any())).willReturn(expected);
 
-    // when & then
-    mockMvc.perform(multipart("/api/users")
-            .file(requestPart)
-            .file(profilePart))
+    // when
+    ResultActions result = mockMvc.perform(multipart("/api/users")
+        .file(requestPart)
+        .file(profilePart));
+
+    // then
+    result
         .andExpect(status().isCreated())
         .andExpect(jsonPath("$.id").value(userId.toString()))
         .andExpect(jsonPath("$.username").value("alpha"))
@@ -78,8 +83,9 @@ class UserControllerSliceTest {
     then(userService).should().create(any(), any());
   }
 
+  // 유저 삭제 실패
   @Test
-  @DisplayName("delete returns not found JSON when the user does not exist")
+  @DisplayName("존재하지 않는 유저 삭제 시 에러 응답 JSON을 검증한다.")
   void delete_fail() throws Exception {
     // given
     UUID userId = UUID.randomUUID();
@@ -88,8 +94,11 @@ class UserControllerSliceTest {
         .given(userService)
         .delete(userId);
 
-    // when & then
-    mockMvc.perform(delete("/api/users/{userId}", userId))
+    // when
+    ResultActions result = mockMvc.perform(delete("/api/users/{userId}", userId));
+
+    // then
+    result
         .andExpect(status().isNotFound())
         .andExpect(jsonPath("$.code").value("U003"))
         .andExpect(jsonPath("$.exceptionType").value("UserNotFoundException"))

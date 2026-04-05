@@ -21,7 +21,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 @ActiveProfiles("test")
 @EnableJpaAuditing
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
-class UserRepositorySliceTest {
+public class UserRepositorySliceTest {
 
   @Autowired
   private UserRepository userRepository;
@@ -32,8 +32,9 @@ class UserRepositorySliceTest {
   @Autowired
   private TestEntityManager entityManager;
 
+  // username으로 유저 조회 성공
   @Test
-  @DisplayName("findByUsername returns a user when the username exists")
+  @DisplayName("username으로 유저 조회를 검증한다.")
   void find_by_username_success() {
     // given
     User savedUser = persistUser("alpha", "alpha@example.com", true);
@@ -47,8 +48,9 @@ class UserRepositorySliceTest {
     assertThat(result.get().getEmail()).isEqualTo("alpha@example.com");
   }
 
+  // username으로 유저 조회 실패
   @Test
-  @DisplayName("findByUsername returns empty when the username does not exist")
+  @DisplayName("존재하지 않는 username으로 조회하면 빈 값을 반환한다.")
   void find_by_username_fail() {
     // when
     Optional<User> result = userRepository.findByUsername("missing");
@@ -57,8 +59,9 @@ class UserRepositorySliceTest {
     assertThat(result).isEmpty();
   }
 
+  // profile, status 포함 전체 유저 조회 성공
   @Test
-  @DisplayName("findAllWithProfileAndStatus returns users with profile and status")
+  @DisplayName("profile과 status를 포함한 전체 유저 조회를 검증한다.")
   void find_all_with_profile_and_status_success() {
     // given
     User savedUser = persistUser("bravo", "bravo@example.com", true);
@@ -74,8 +77,9 @@ class UserRepositorySliceTest {
     assertThat(result.get(0).getStatus().getUser().getId()).isEqualTo(savedUser.getId());
   }
 
+  // profile, status 포함 전체 유저 조회 실패
   @Test
-  @DisplayName("findAllWithProfileAndStatus returns an empty list when no users exist")
+  @DisplayName("저장된 유저가 없으면 빈 목록을 반환한다.")
   void find_all_with_profile_and_status_fail() {
     // when
     List<User> result = userRepository.findAllWithProfileAndStatus();

@@ -18,6 +18,7 @@ import org.springframework.http.MediaType;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.ResultActions;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
@@ -31,7 +32,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @WebMvcTest(ChannelController.class)
 @ActiveProfiles("test")
-class ChannelControllerSliceTest {
+public class ChannelControllerSliceTest {
 
   @Autowired
   private MockMvc mockMvc;
@@ -41,8 +42,9 @@ class ChannelControllerSliceTest {
   @MockitoBean
   private ChannelService channelService;
 
+  // 공개 채널 생성 성공
   @Test
-  @DisplayName("create public channel returns the created channel as JSON")
+  @DisplayName("공개 채널 생성 응답 JSON을 검증한다.")
   void create_public_success() throws Exception {
     // given
     UUID channelId = UUID.randomUUID();
@@ -58,10 +60,13 @@ class ChannelControllerSliceTest {
 
     given(channelService.create(any(PublicChannelCreateRequest.class))).willReturn(expected);
 
-    // when & then
-    mockMvc.perform(post("/api/channels/public")
-            .contentType(MediaType.APPLICATION_JSON)
-            .content(objectMapper.writeValueAsBytes(request)))
+    // when
+    ResultActions result = mockMvc.perform(post("/api/channels/public")
+        .contentType(MediaType.APPLICATION_JSON)
+        .content(objectMapper.writeValueAsBytes(request)));
+
+    // then
+    result
         .andExpect(status().isCreated())
         .andExpect(jsonPath("$.id").value(channelId.toString()))
         .andExpect(jsonPath("$.type").value("PUBLIC"))
@@ -72,8 +77,9 @@ class ChannelControllerSliceTest {
     then(channelService).should().create(any(PublicChannelCreateRequest.class));
   }
 
+  // 채널 수정 실패
   @Test
-  @DisplayName("update returns not found JSON when the channel does not exist")
+  @DisplayName("존재하지 않는 채널 수정 시 에러 응답 JSON을 검증한다.")
   void update_fail() throws Exception {
     // given
     UUID channelId = UUID.randomUUID();
@@ -83,10 +89,13 @@ class ChannelControllerSliceTest {
         .given(channelService)
         .update(eq(channelId), any(PublicChannelUpdateRequest.class));
 
-    // when & then
-    mockMvc.perform(patch("/api/channels/{channelId}", channelId)
-            .contentType(MediaType.APPLICATION_JSON)
-            .content(objectMapper.writeValueAsBytes(request)))
+    // when
+    ResultActions result = mockMvc.perform(patch("/api/channels/{channelId}", channelId)
+        .contentType(MediaType.APPLICATION_JSON)
+        .content(objectMapper.writeValueAsBytes(request)));
+
+    // then
+    result
         .andExpect(status().isNotFound())
         .andExpect(jsonPath("$.code").value("C001"))
         .andExpect(jsonPath("$.exceptionType").value("ChannelNotFoundException"))

@@ -18,6 +18,7 @@ import org.springframework.http.MediaType;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.ResultActions;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
@@ -31,7 +32,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @WebMvcTest(MessageController.class)
 @ActiveProfiles("test")
-class MessageControllerSliceTest {
+public class MessageControllerSliceTest {
 
   @Autowired
   private MockMvc mockMvc;
@@ -41,8 +42,9 @@ class MessageControllerSliceTest {
   @MockitoBean
   private MessageService messageService;
 
+  // 채널별 메시지 조회 성공
   @Test
-  @DisplayName("findAllByChannelId returns paged messages as JSON")
+  @DisplayName("채널별 메시지 조회 응답 JSON을 검증한다.")
   void find_all_by_channel_id_success() throws Exception {
     // given
     UUID channelId = UUID.randomUUID();
@@ -68,13 +70,16 @@ class MessageControllerSliceTest {
 
     given(messageService.findAllByChannelId(eq(channelId), eq(cursor), any())).willReturn(expected);
 
-    // when & then
-    mockMvc.perform(get("/api/messages")
-            .param("channelId", channelId.toString())
-            .param("cursor", cursor.toString())
-            .param("page", "0")
-            .param("size", "2")
-            .param("sort", "createdAt,desc"))
+    // when
+    ResultActions result = mockMvc.perform(get("/api/messages")
+        .param("channelId", channelId.toString())
+        .param("cursor", cursor.toString())
+        .param("page", "0")
+        .param("size", "2")
+        .param("sort", "createdAt,desc"));
+
+    // then
+    result
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.content[0].id").value(messageId.toString()))
         .andExpect(jsonPath("$.content[0].content").value("hello"))
@@ -86,8 +91,9 @@ class MessageControllerSliceTest {
     then(messageService).should().findAllByChannelId(eq(channelId), eq(cursor), any());
   }
 
+  // 메시지 수정 실패
   @Test
-  @DisplayName("update returns not found JSON when the message does not exist")
+  @DisplayName("존재하지 않는 메시지 수정 시 에러 응답 JSON을 검증한다.")
   void update_fail() throws Exception {
     // given
     UUID messageId = UUID.randomUUID();
@@ -97,10 +103,13 @@ class MessageControllerSliceTest {
         .given(messageService)
         .update(eq(messageId), any(MessageUpdateRequest.class));
 
-    // when & then
-    mockMvc.perform(patch("/api/messages/{messageId}", messageId)
-            .contentType(MediaType.APPLICATION_JSON)
-            .content(objectMapper.writeValueAsBytes(request)))
+    // when
+    ResultActions result = mockMvc.perform(patch("/api/messages/{messageId}", messageId)
+        .contentType(MediaType.APPLICATION_JSON)
+        .content(objectMapper.writeValueAsBytes(request)));
+
+    // then
+    result
         .andExpect(status().isNotFound())
         .andExpect(jsonPath("$.code").value("M001"))
         .andExpect(jsonPath("$.exceptionType").value("MessageNotFoundException"))
