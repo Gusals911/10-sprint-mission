@@ -77,7 +77,6 @@ public class BasicChannerServiceTest {
     // 비공개 채널 생성 성공
     @Test
     @DisplayName("비공개 채널 생성을 검증한다.")
-    @SuppressWarnings("unchecked")
     void create_private_channel_success() {
         // given
         ArgumentCaptor<Channel> channelCaptor = ArgumentCaptor.forClass(Channel.class);
