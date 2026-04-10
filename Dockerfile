@@ -18,7 +18,7 @@ COPY src src
 RUN ./gradlew bootJar --no-daemon
 
 # runtime stage
-FROM eclipse-temurin:17-jre
+FROM amazoncorretto:17-alpine-jdk
 WORKDIR /app
 
 COPY --from=build /app/build/libs/*.jar app.jar
