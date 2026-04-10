@@ -73,6 +73,35 @@ jobs:
           SHORT_SHA=${{ needs.build-and-push.outputs.image_tag }}
           echo "IMAGE_URI=${{ vars.ECR_REPOSITORY_URI }}:${SHORT_SHA}" >> $GITHUB_ENV
 
+      - name: Stop running service temporarily
+        run: |
+          aws ecs update-service \
+            --cluster ${{ vars.ECS_CLUSTER }} \
+            --service ${{ vars.ECS_SERVICE }} \
+            --desired-count 0
+
+      - name: Wait until running task count becomes 0
+        run: |
+          for i in {1..30}; do
+            RUNNING_COUNT=$(aws ecs describe-services \
+              --cluster ${{ vars.ECS_CLUSTER }} \
+              --services ${{ vars.ECS_SERVICE }} \
+              --query 'services[0].runningCount' \
+              --output text)
+
+            echo "Current runningCount: $RUNNING_COUNT"
+
+            if [ "$RUNNING_COUNT" = "0" ]; then
+              echo "All running tasks are stopped."
+              exit 0
+            fi
+
+            sleep 10
+          done
+
+          echo "Timed out waiting for runningCount to become 0."
+          exit 1
+
       - name: Download current task definition
         run: |
           aws ecs describe-task-definition \
@@ -94,13 +123,6 @@ jobs:
               | .containerDefinitions[0].image = env.IMAGE_URI' \
             task-definition.json > new-task-definition.json
 
-      - name: Stop running service temporarily
-        run: |
-          aws ecs update-service \
-            --cluster ${{ vars.ECS_CLUSTER }} \
-            --service ${{ vars.ECS_SERVICE }} \
-            --desired-count 0
-
       - name: Register new task definition
         id: register
         run: |
@@ -110,7 +132,7 @@ jobs:
             --output text)
           echo "task_def_arn=${TASK_DEF_ARN}" >> $GITHUB_OUTPUT
 
-      - name: Update ECS service
+      - name: Update ECS service with new task definition
         run: |
           aws ecs update-service \
             --cluster ${{ vars.ECS_CLUSTER }} \
