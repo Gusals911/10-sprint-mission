@@ -1,0 +1,141 @@
+name: CD
+
+on:
+  push:
+    branches:
+      - release
+
+jobs:
+  build-and-push:
+    name: Build and push Docker image
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+
+    outputs:
+      image_tag: ${{ steps.meta.outputs.image_tag }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials for Public ECR
+        uses: aws-actions/configure-aws-credentials@v6
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_KEY }}
+          aws-region: us-east-1
+
+      - name: Login to Amazon Public ECR
+        uses: aws-actions/amazon-ecr-login@v2
+        with:
+          registry-type: public
+
+      - name: Set image metadata
+        id: meta
+        run: |
+          SHORT_SHA=${GITHUB_SHA::7}
+          echo "image_tag=${SHORT_SHA}" >> $GITHUB_OUTPUT
+          echo "IMAGE_URI_SHA=${{ vars.ECR_REPOSITORY_URI }}:${SHORT_SHA}" >> $GITHUB_ENV
+          echo "IMAGE_URI_LATEST=${{ vars.ECR_REPOSITORY_URI }}:latest" >> $GITHUB_ENV
+
+      - name: Build Docker image
+        run: |
+          docker build -t $IMAGE_URI_SHA -t $IMAGE_URI_LATEST .
+
+      - name: Push Docker image
+        run: |
+          docker push $IMAGE_URI_SHA
+          docker push $IMAGE_URI_LATEST
+
+  deploy:
+    name: Deploy to ECS
+    runs-on: ubuntu-latest
+    needs: build-and-push
+
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials for ECS
+        uses: aws-actions/configure-aws-credentials@v6
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_KEY }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - name: Prepare image uri
+        run: |
+          SHORT_SHA=${{ needs.build-and-push.outputs.image_tag }}
+          echo "IMAGE_URI=${{ vars.ECR_REPOSITORY_URI }}:${SHORT_SHA}" >> $GITHUB_ENV
+
+      - name: Stop running service temporarily
+        run: |
+          aws ecs update-service \
+            --cluster ${{ vars.ECS_CLUSTER }} \
+            --service ${{ vars.ECS_SERVICE }} \
+            --desired-count 0
+
+      - name: Wait until running task count becomes 0
+        run: |
+          for i in {1..30}; do
+            RUNNING_COUNT=$(aws ecs describe-services \
+              --cluster ${{ vars.ECS_CLUSTER }} \
+              --services ${{ vars.ECS_SERVICE }} \
+              --query 'services[0].runningCount' \
+              --output text)
+
+            echo "Current runningCount: $RUNNING_COUNT"
+
+            if [ "$RUNNING_COUNT" = "0" ]; then
+              echo "All running tasks are stopped."
+              exit 0
+            fi
+
+            sleep 10
+          done
+
+          echo "Timed out waiting for runningCount to become 0."
+          exit 1
+
+      - name: Download current task definition
+        run: |
+          aws ecs describe-task-definition \
+            --task-definition ${{ vars.ECS_TASK_DEFINITION }} \
+            --query taskDefinition \
+            > task-definition.json
+
+      - name: Render new task definition image
+        run: |
+          jq 'del(
+                .taskDefinitionArn,
+                .revision,
+                .status,
+                .requiresAttributes,
+                .compatibilities,
+                .registeredAt,
+                .registeredBy
+              )
+              | .containerDefinitions[0].image = env.IMAGE_URI' \
+            task-definition.json > new-task-definition.json
+
+      - name: Register new task definition
+        id: register
+        run: |
+          TASK_DEF_ARN=$(aws ecs register-task-definition \
+            --cli-input-json file://new-task-definition.json \
+            --query 'taskDefinition.taskDefinitionArn' \
+            --output text)
+          echo "task_def_arn=${TASK_DEF_ARN}" >> $GITHUB_OUTPUT
+
+      - name: Update ECS service with new task definition
+        run: |
+          aws ecs update-service \
+            --cluster ${{ vars.ECS_CLUSTER }} \
+            --service ${{ vars.ECS_SERVICE }} \
+            --task-definition ${{ steps.register.outputs.task_def_arn }} \
+            --desired-count 1

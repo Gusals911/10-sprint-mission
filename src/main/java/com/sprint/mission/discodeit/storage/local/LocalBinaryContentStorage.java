@@ -1,9 +1,6 @@
 package com.sprint.mission.discodeit.storage.local;
 
 import com.sprint.mission.discodeit.dto.data.BinaryContentDto;
-import com.sprint.mission.discodeit.exception.binaryContent.BinaryContentAlreadyExistsException;
-import com.sprint.mission.discodeit.exception.binaryContent.BinaryContentNotFoundException;
-import com.sprint.mission.discodeit.exception.binaryContent.BinaryContentStorageException;
 import com.sprint.mission.discodeit.storage.BinaryContentStorage;
 import jakarta.annotation.PostConstruct;
 import java.io.IOException;
@@ -40,7 +37,8 @@ public class LocalBinaryContentStorage implements BinaryContentStorage {
       try {
         Files.createDirectories(root);
       } catch (IOException e) {
-        throw new BinaryContentStorageException("initStorage", "binaryContent");
+        e.printStackTrace();
+        throw new RuntimeException(e);
       }
     }
   }
@@ -48,12 +46,12 @@ public class LocalBinaryContentStorage implements BinaryContentStorage {
   public UUID put(UUID binaryContentId, byte[] bytes) {
     Path filePath = resolvePath(binaryContentId);
     if (Files.exists(filePath)) {
-      throw new BinaryContentAlreadyExistsException(binaryContentId);
+      throw new IllegalArgumentException("File with key " + binaryContentId + " already exists");
     }
     try (OutputStream outputStream = Files.newOutputStream(filePath)) {
       outputStream.write(bytes);
     } catch (IOException e) {
-      throw new BinaryContentStorageException("store", "binaryContent");
+      throw new RuntimeException(e);
     }
     return binaryContentId;
   }
@@ -61,12 +59,25 @@ public class LocalBinaryContentStorage implements BinaryContentStorage {
   public InputStream get(UUID binaryContentId) {
     Path filePath = resolvePath(binaryContentId);
     if (Files.notExists(filePath)) {
-      throw new BinaryContentNotFoundException(binaryContentId);
+      throw new NoSuchElementException("File with key " + binaryContentId + " does not exist");
     }
     try {
       return Files.newInputStream(filePath);
     } catch (IOException e) {
-      throw new BinaryContentStorageException("read", "binaryContent");
+      e.printStackTrace();
+      throw new RuntimeException(e);
+    }
+  }
+
+  @Override
+  public void delete(UUID binaryContentId) {
+    Path filePath = resolvePath(binaryContentId);
+    try {
+      if (!Files.deleteIfExists(filePath)) {
+        throw new NoSuchElementException("File with key " + binaryContentId + " does not exist");
+      }
+    } catch (IOException e) {
+      throw new RuntimeException(e);
     }
   }
 

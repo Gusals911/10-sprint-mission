@@ -1,0 +1,157 @@
+package com.sprint.mission.discodeit.service.basic;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.verify;
+
+import com.sprint.mission.discodeit.dto.data.BinaryContentDto;
+import com.sprint.mission.discodeit.dto.request.BinaryContentCreateRequest;
+import com.sprint.mission.discodeit.entity.BinaryContent;
+import com.sprint.mission.discodeit.exception.binarycontent.BinaryContentNotFoundException;
+import com.sprint.mission.discodeit.mapper.BinaryContentMapper;
+import com.sprint.mission.discodeit.repository.BinaryContentRepository;
+import com.sprint.mission.discodeit.storage.BinaryContentStorageSupport;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.test.util.ReflectionTestUtils;
+
+@ExtendWith(MockitoExtension.class)
+class BasicBinaryContentServiceTest {
+
+  @Mock
+  private BinaryContentRepository binaryContentRepository;
+
+  @Mock
+  private BinaryContentMapper binaryContentMapper;
+
+  @Mock
+  private BinaryContentStorageSupport binaryContentStorageSupport;
+
+  @InjectMocks
+  private BasicBinaryContentService binaryContentService;
+
+  private UUID binaryContentId;
+  private String fileName;
+  private String contentType;
+  private byte[] bytes;
+  private BinaryContent binaryContent;
+  private BinaryContentDto binaryContentDto;
+
+  @BeforeEach
+  void setUp() {
+    binaryContentId = UUID.randomUUID();
+    fileName = "test.jpg";
+    contentType = "image/jpeg";
+    bytes = "test data".getBytes();
+
+    binaryContent = new BinaryContent(fileName, (long) bytes.length, contentType);
+    ReflectionTestUtils.setField(binaryContent, "id", binaryContentId);
+
+    binaryContentDto = new BinaryContentDto(
+        binaryContentId,
+        fileName,
+        (long) bytes.length,
+        contentType
+    );
+  }
+
+  @Test
+  @DisplayName("諛붿씠?덈━ 肄섑뀗痢??앹꽦 ?깃났")
+  void createBinaryContent_Success() {
+    BinaryContentCreateRequest request = new BinaryContentCreateRequest(fileName, contentType,
+        bytes);
+
+    given(binaryContentRepository.save(any(BinaryContent.class))).will(invocation -> {
+      BinaryContent savedBinaryContent = invocation.getArgument(0);
+      ReflectionTestUtils.setField(savedBinaryContent, "id", binaryContentId);
+      return savedBinaryContent;
+    });
+    given(binaryContentMapper.toDto(any(BinaryContent.class))).willReturn(binaryContentDto);
+
+    BinaryContentDto result = binaryContentService.create(request);
+
+    assertThat(result).isEqualTo(binaryContentDto);
+    verify(binaryContentRepository).save(any(BinaryContent.class));
+    verify(binaryContentStorageSupport).put(binaryContentId, bytes);
+  }
+
+  @Test
+  @DisplayName("諛붿씠?덈━ 肄섑뀗痢?議고쉶 ?깃났")
+  void findBinaryContent_Success() {
+    given(binaryContentRepository.findById(eq(binaryContentId))).willReturn(
+        Optional.of(binaryContent));
+    given(binaryContentMapper.toDto(eq(binaryContent))).willReturn(binaryContentDto);
+
+    BinaryContentDto result = binaryContentService.find(binaryContentId);
+
+    assertThat(result).isEqualTo(binaryContentDto);
+  }
+
+  @Test
+  @DisplayName("議댁옱?섏? ?딅뒗 諛붿씠?덈━ 肄섑뀗痢?議고쉶 ???덉쇅 諛쒖깮")
+  void findBinaryContent_WithNonExistentId_ThrowsException() {
+    given(binaryContentRepository.findById(eq(binaryContentId))).willReturn(Optional.empty());
+
+    assertThatThrownBy(() -> binaryContentService.find(binaryContentId))
+        .isInstanceOf(BinaryContentNotFoundException.class);
+  }
+
+  @Test
+  @DisplayName("?щ윭 ID濡?諛붿씠?덈━ 肄섑뀗痢?紐⑸줉 議고쉶 ?깃났")
+  void findAllByIdIn_Success() {
+    UUID id1 = UUID.randomUUID();
+    UUID id2 = UUID.randomUUID();
+    List<UUID> ids = Arrays.asList(id1, id2);
+
+    BinaryContent content1 = new BinaryContent("file1.jpg", 100L, "image/jpeg");
+    ReflectionTestUtils.setField(content1, "id", id1);
+
+    BinaryContent content2 = new BinaryContent("file2.jpg", 200L, "image/png");
+    ReflectionTestUtils.setField(content2, "id", id2);
+
+    List<BinaryContent> contents = Arrays.asList(content1, content2);
+
+    BinaryContentDto dto1 = new BinaryContentDto(id1, "file1.jpg", 100L, "image/jpeg");
+    BinaryContentDto dto2 = new BinaryContentDto(id2, "file2.jpg", 200L, "image/png");
+
+    given(binaryContentRepository.findAllById(eq(ids))).willReturn(contents);
+    given(binaryContentMapper.toDto(eq(content1))).willReturn(dto1);
+    given(binaryContentMapper.toDto(eq(content2))).willReturn(dto2);
+
+    List<BinaryContentDto> result = binaryContentService.findAllByIdIn(ids);
+
+    assertThat(result).containsExactly(dto1, dto2);
+  }
+
+  @Test
+  @DisplayName("諛붿씠?덈━ 肄섑뀗痢???젣 ?깃났")
+  void deleteBinaryContent_Success() {
+    given(binaryContentRepository.findById(eq(binaryContentId))).willReturn(Optional.of(binaryContent));
+
+    binaryContentService.delete(binaryContentId);
+
+    verify(binaryContentRepository).delete(binaryContent);
+    verify(binaryContentStorageSupport).deleteAfterCommit(binaryContentId);
+  }
+
+  @Test
+  @DisplayName("議댁옱?섏? ?딅뒗 諛붿씠?덈━ 肄섑뀗痢???젣 ???덉쇅 諛쒖깮")
+  void deleteBinaryContent_WithNonExistentId_ThrowsException() {
+    given(binaryContentRepository.findById(eq(binaryContentId))).willReturn(Optional.empty());
+
+    assertThatThrownBy(() -> binaryContentService.delete(binaryContentId))
+        .isInstanceOf(BinaryContentNotFoundException.class);
+  }
+}
