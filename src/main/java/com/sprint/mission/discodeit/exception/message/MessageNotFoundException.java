@@ -8,10 +8,13 @@ public class MessageNotFoundException extends MessageException {
     public MessageNotFoundException() {
         super(ErrorCode.MESSAGE_NOT_FOUND);
     }
+
+    public MessageNotFoundException(UUID messageId) {
+        this();
+        addDetail("messageId", messageId);
+    }
     
     public static MessageNotFoundException withId(UUID messageId) {
-        MessageNotFoundException exception = new MessageNotFoundException();
-        exception.addDetail("messageId", messageId);
-        return exception;
+        return new MessageNotFoundException(messageId);
     }
-} 
+}

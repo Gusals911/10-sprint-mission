@@ -21,6 +21,7 @@ import com.sprint.mission.discodeit.repository.ReadStatusRepository;
 import com.sprint.mission.discodeit.repository.UserRepository;
 import com.sprint.mission.discodeit.service.ChannelService;
 import com.sprint.mission.discodeit.storage.BinaryContentStorageSupport;
+import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -43,20 +44,20 @@ public class BasicChannelService implements ChannelService {
   @Transactional
   @Override
   public ChannelDto create(PublicChannelCreateRequest request) {
-    log.debug("梨꾨꼸 ?앹꽦 ?쒖옉: {}", request);
+    log.debug("채널 생성 시작: {}", request);
     String name = request.name();
     String description = request.description();
     Channel channel = new Channel(ChannelType.PUBLIC, name, description);
 
     channelRepository.save(channel);
-    log.info("梨꾨꼸 ?앹꽦 ?꾨즺: id={}, name={}", channel.getId(), channel.getName());
+    log.info("채널 생성 완료: id={}, name={}", channel.getId(), channel.getName());
     return channelMapper.toDto(channel);
   }
 
   @Transactional
   @Override
   public ChannelDto create(PrivateChannelCreateRequest request) {
-    log.debug("梨꾨꼸 ?앹꽦 ?쒖옉: {}", request);
+    log.debug("채널 생성 시작: {}", request);
 
     List<UUID> participantIds = request.participantIds().stream()
         .distinct()
@@ -84,7 +85,7 @@ public class BasicChannelService implements ChannelService {
         .toList();
     readStatusRepository.saveAll(readStatuses);
 
-    log.info("梨꾨꼸 ?앹꽦 ?꾨즺: id={}, name={}", channel.getId(), channel.getName());
+    log.info("채널 생성 완료: id={}, name={}", channel.getId(), channel.getName());
     return channelMapper.toDto(channel);
   }
 
@@ -113,7 +114,7 @@ public class BasicChannelService implements ChannelService {
   @Transactional
   @Override
   public ChannelDto update(UUID channelId, PublicChannelUpdateRequest request) {
-    log.debug("梨꾨꼸 ?섏젙 ?쒖옉: id={}, request={}", channelId, request);
+    log.debug("채널 수정 시작: id={}, request={}", channelId, request);
     String newName = request.newName();
     String newDescription = request.newDescription();
     Channel channel = channelRepository.findById(channelId)
@@ -122,29 +123,40 @@ public class BasicChannelService implements ChannelService {
       throw PrivateChannelUpdateException.forChannel(channelId);
     }
     channel.update(newName, newDescription);
-    log.info("梨꾨꼸 ?섏젙 ?꾨즺: id={}, name={}", channelId, channel.getName());
+    log.info("채널 수정 완료: id={}, name={}", channelId, channel.getName());
     return channelMapper.toDto(channel);
   }
 
   @Transactional
   @Override
   public void delete(UUID channelId) {
-    log.debug("梨꾨꼸 ??젣 ?쒖옉: id={}", channelId);
+    log.debug("채널 삭제 시작: id={}", channelId);
     if (!channelRepository.existsById(channelId)) {
       throw ChannelNotFoundException.withId(channelId);
     }
 
     List<Message> messages = messageRepository.findAllByChannelIdWithAttachments(channelId);
-    messages.stream()
+    if (messages == null) {
+      messages = Collections.emptyList();
+    }
+
+    List<UUID> attachmentIds = messages.stream()
         .map(Message::getAttachments)
         .flatMap(List::stream)
         .map(BinaryContent::getId)
-        .forEach(binaryContentStorageSupport::deleteAfterCommit);
+        .toList();
+    if (!attachmentIds.isEmpty()) {
+      attachmentIds.forEach(binaryContentStorageSupport::deleteAfterCommit);
+    }
 
-    messageRepository.deleteAll(messages);
+    if (messages.isEmpty()) {
+      messageRepository.deleteAllByChannelId(channelId);
+    } else {
+      messageRepository.deleteAll(messages);
+    }
     readStatusRepository.deleteAllByChannelId(channelId);
 
     channelRepository.deleteById(channelId);
-    log.info("梨꾨꼸 ??젣 ?꾨즺: id={}", channelId);
+    log.info("채널 삭제 완료: id={}", channelId);
   }
 }
