@@ -48,7 +48,7 @@ public class BasicMessageService implements MessageService {
   @Override
   public MessageDto create(MessageCreateRequest messageCreateRequest,
       List<BinaryContentCreateRequest> binaryContentCreateRequests) {
-    log.debug("硫붿떆吏 ?앹꽦 ?쒖옉: request={}", messageCreateRequest);
+    log.debug("메시지 생성 시작: request={}", messageCreateRequest);
     UUID channelId = messageCreateRequest.channelId();
     UUID authorId = messageCreateRequest.authorId();
 
@@ -70,7 +70,7 @@ public class BasicMessageService implements MessageService {
     );
 
     messageRepository.save(message);
-    log.info("硫붿떆吏 ?앹꽦 ?꾨즺: id={}, channelId={}", message.getId(), channelId);
+    log.info("메시지 생성 완료: id={}, channelId={}", message.getId(), channelId);
     return messageMapper.toDto(message);
   }
 
@@ -103,26 +103,26 @@ public class BasicMessageService implements MessageService {
   @Transactional
   @Override
   public MessageDto update(UUID messageId, MessageUpdateRequest request) {
-    log.debug("硫붿떆吏 ?섏젙 ?쒖옉: id={}, request={}", messageId, request);
+    log.debug("메시지 수정 시작: id={}, request={}", messageId, request);
     Message message = messageRepository.findById(messageId)
         .orElseThrow(() -> MessageNotFoundException.withId(messageId));
 
     message.update(request.newContent());
-    log.info("硫붿떆吏 ?섏젙 ?꾨즺: id={}, channelId={}", messageId, message.getChannel().getId());
+    log.info("메시지 수정 완료: id={}, channelId={}", messageId, message.getChannel().getId());
     return messageMapper.toDto(message);
   }
 
   @Transactional
   @Override
   public void delete(UUID messageId) {
-    log.debug("硫붿떆吏 ??젣 ?쒖옉: id={}", messageId);
+    log.debug("메시지 삭제 시작: id={}", messageId);
     Message message = messageRepository.findByIdWithAttachments(messageId)
         .orElseThrow(() -> MessageNotFoundException.withId(messageId));
     message.getAttachments().stream()
         .map(BinaryContent::getId)
         .forEach(binaryContentStorageSupport::deleteAfterCommit);
     messageRepository.delete(message);
-    log.info("硫붿떆吏 ??젣 ?꾨즺: id={}", messageId);
+    log.info("메시지 삭제 완료: id={}", messageId);
   }
 
   private BinaryContent saveBinaryContent(BinaryContentCreateRequest request) {

@@ -39,7 +39,7 @@ public class BasicUserService implements UserService {
   @Override
   public UserDto create(UserCreateRequest userCreateRequest,
       Optional<BinaryContentCreateRequest> optionalProfileCreateRequest) {
-    log.debug("?ъ슜???앹꽦 ?쒖옉: {}", userCreateRequest);
+    log.debug("사용자 생성 시작: {}", userCreateRequest);
 
     String username = userCreateRequest.username();
     String email = userCreateRequest.email();
@@ -61,28 +61,28 @@ public class BasicUserService implements UserService {
     new UserStatus(user, now);
 
     userRepository.save(user);
-    log.info("?ъ슜???앹꽦 ?꾨즺: id={}, username={}", user.getId(), username);
+    log.info("사용자 생성 완료: id={}, username={}", user.getId(), username);
     return userMapper.toDto(user);
   }
 
   @Override
   public UserDto find(UUID userId) {
-    log.debug("?ъ슜??議고쉶 ?쒖옉: id={}", userId);
+    log.debug("사용자 조회 시작: id={}", userId);
     UserDto userDto = userRepository.findById(userId)
         .map(userMapper::toDto)
         .orElseThrow(() -> UserNotFoundException.withId(userId));
-    log.info("?ъ슜??議고쉶 ?꾨즺: id={}", userId);
+    log.info("사용자 조회 완료: id={}", userId);
     return userDto;
   }
 
   @Override
   public List<UserDto> findAll() {
-    log.debug("紐⑤뱺 ?ъ슜??議고쉶 ?쒖옉");
+    log.debug("모든 사용자 조회 시작");
     List<UserDto> userDtos = userRepository.findAllWithProfileAndStatus()
         .stream()
         .map(userMapper::toDto)
         .toList();
-    log.info("紐⑤뱺 ?ъ슜??議고쉶 ?꾨즺: 珥?{}紐?", userDtos.size());
+    log.info("모든 사용자 조회 완료: 총 {}명", userDtos.size());
     return userDtos;
   }
 
@@ -90,7 +90,7 @@ public class BasicUserService implements UserService {
   @Override
   public UserDto update(UUID userId, UserUpdateRequest userUpdateRequest,
       Optional<BinaryContentCreateRequest> optionalProfileCreateRequest) {
-    log.debug("?ъ슜???섏젙 ?쒖옉: id={}, request={}", userId, userUpdateRequest);
+    log.debug("사용자 수정 시작: id={}, request={}", userId, userUpdateRequest);
 
     User user = userRepository.findById(userId)
         .orElseThrow(() -> UserNotFoundException.withId(userId));
@@ -120,14 +120,14 @@ public class BasicUserService implements UserService {
         .orElse(null);
     user.update(newUsername, newEmail, newPassword, nullableProfile);
 
-    log.info("?ъ슜???섏젙 ?꾨즺: id={}", userId);
+    log.info("사용자 수정 완료: id={}", userId);
     return userMapper.toDto(user);
   }
 
   @Transactional
   @Override
   public void delete(UUID userId) {
-    log.debug("?ъ슜????젣 ?쒖옉: id={}", userId);
+    log.debug("사용자 삭제 시작: id={}", userId);
 
     User user = userRepository.findByIdWithProfile(userId)
         .orElseThrow(() -> UserNotFoundException.withId(userId));
@@ -137,7 +137,7 @@ public class BasicUserService implements UserService {
     }
 
     userRepository.delete(user);
-    log.info("?ъ슜????젣 ?꾨즺: id={}", userId);
+    log.info("사용자 삭제 완료: id={}", userId);
   }
 
   private BinaryContent saveBinaryContent(BinaryContentCreateRequest request) {

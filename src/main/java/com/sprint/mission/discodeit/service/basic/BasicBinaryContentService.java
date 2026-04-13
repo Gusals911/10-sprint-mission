@@ -3,7 +3,7 @@ package com.sprint.mission.discodeit.service.basic;
 import com.sprint.mission.discodeit.dto.data.BinaryContentDto;
 import com.sprint.mission.discodeit.dto.request.BinaryContentCreateRequest;
 import com.sprint.mission.discodeit.entity.BinaryContent;
-import com.sprint.mission.discodeit.exception.binarycontent.BinaryContentNotFoundException;
+import com.sprint.mission.discodeit.exception.binaryContent.BinaryContentNotFoundException;
 import com.sprint.mission.discodeit.mapper.BinaryContentMapper;
 import com.sprint.mission.discodeit.repository.BinaryContentRepository;
 import com.sprint.mission.discodeit.service.BinaryContentService;
@@ -27,7 +27,7 @@ public class BasicBinaryContentService implements BinaryContentService {
   @Transactional
   @Override
   public BinaryContentDto create(BinaryContentCreateRequest request) {
-    log.debug("諛붿씠?덈━ 而⑦뀗痢??앹꽦 ?쒖옉: fileName={}, size={}, contentType={}",
+    log.debug("바이너리 컨텐츠 생성 시작: fileName={}, size={}, contentType={}",
         request.fileName(), request.bytes().length, request.contentType());
 
     String fileName = request.fileName();
@@ -41,40 +41,40 @@ public class BasicBinaryContentService implements BinaryContentService {
     binaryContentRepository.save(binaryContent);
     binaryContentStorageSupport.put(binaryContent.getId(), bytes);
 
-    log.info("諛붿씠?덈━ 而⑦뀗痢??앹꽦 ?꾨즺: id={}, fileName={}, size={}",
+    log.info("바이너리 컨텐츠 생성 완료: id={}, fileName={}, size={}",
         binaryContent.getId(), fileName, bytes.length);
     return binaryContentMapper.toDto(binaryContent);
   }
 
   @Override
   public BinaryContentDto find(UUID binaryContentId) {
-    log.debug("諛붿씠?덈━ 而⑦뀗痢?議고쉶 ?쒖옉: id={}", binaryContentId);
+    log.debug("바이너리 컨텐츠 조회 시작: id={}", binaryContentId);
     BinaryContentDto dto = binaryContentRepository.findById(binaryContentId)
         .map(binaryContentMapper::toDto)
         .orElseThrow(() -> BinaryContentNotFoundException.withId(binaryContentId));
-    log.info("諛붿씠?덈━ 而⑦뀗痢?議고쉶 ?꾨즺: id={}, fileName={}",
+    log.info("바이너리 컨텐츠 조회 완료: id={}, fileName={}",
         dto.id(), dto.fileName());
     return dto;
   }
 
   @Override
   public List<BinaryContentDto> findAllByIdIn(List<UUID> binaryContentIds) {
-    log.debug("諛붿씠?덈━ 而⑦뀗痢?紐⑸줉 議고쉶 ?쒖옉: ids={}", binaryContentIds);
+    log.debug("바이너리 컨텐츠 목록 조회 시작: ids={}", binaryContentIds);
     List<BinaryContentDto> dtos = binaryContentRepository.findAllById(binaryContentIds).stream()
         .map(binaryContentMapper::toDto)
         .toList();
-    log.info("諛붿씠?덈━ 而⑦뀗痢?紐⑸줉 議고쉶 ?꾨즺: 議고쉶????ぉ ??{}", dtos.size());
+    log.info("바이너리 컨텐츠 목록 조회 완료: 조회된 항목 수={}", dtos.size());
     return dtos;
   }
 
   @Transactional
   @Override
   public void delete(UUID binaryContentId) {
-    log.debug("諛붿씠?덈━ 而⑦뀗痢???젣 ?쒖옉: id={}", binaryContentId);
+    log.debug("바이너리 컨텐츠 삭제 시작: id={}", binaryContentId);
     BinaryContent binaryContent = binaryContentRepository.findById(binaryContentId)
         .orElseThrow(() -> BinaryContentNotFoundException.withId(binaryContentId));
     binaryContentRepository.delete(binaryContent);
     binaryContentStorageSupport.deleteAfterCommit(binaryContentId);
-    log.info("諛붿씠?덈━ 而⑦뀗痢???젣 ?꾨즺: id={}", binaryContentId);
+    log.info("바이너리 컨텐츠 삭제 완료: id={}", binaryContentId);
   }
 }

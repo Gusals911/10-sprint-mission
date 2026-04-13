@@ -8,11 +8,14 @@ public class UserNotFoundException extends UserException {
     public UserNotFoundException() {
         super(ErrorCode.USER_NOT_FOUND);
     }
+
+    public UserNotFoundException(UUID userId) {
+        this();
+        addDetail("userId", userId);
+    }
     
     public static UserNotFoundException withId(UUID userId) {
-        UserNotFoundException exception = new UserNotFoundException();
-        exception.addDetail("userId", userId);
-        return exception;
+        return new UserNotFoundException(userId);
     }
     
     public static UserNotFoundException withUsername(String username) {
@@ -20,4 +23,4 @@ public class UserNotFoundException extends UserException {
         exception.addDetail("username", username);
         return exception;
     }
-} 
+}
