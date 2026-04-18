@@ -51,7 +51,7 @@ public class BasicReadStatusService implements ReadStatusService {
           throw DuplicateReadStatusException.withUserIdAndChannelId(userId, channelId);
         });
 
-    Instant lastReadAt = request.lastReadAt();
+    Instant lastReadAt = clampToNow(request.lastReadAt());
     ReadStatus readStatus = readStatusRepository.save(new ReadStatus(user, channel, lastReadAt));
 
     log.info("읽음 상태 생성 완료: id={}, userId={}, channelId={}", 
@@ -82,11 +82,12 @@ public class BasicReadStatusService implements ReadStatusService {
   @Transactional
   @Override
   public ReadStatusDto update(UUID readStatusId, ReadStatusUpdateRequest request) {
-    log.debug("읽음 상태 수정 시작: id={}, newLastReadAt={}", readStatusId, request.newLastReadAt());
+    Instant newLastReadAt = clampToNow(request.newLastReadAt());
+    log.debug("읽음 상태 수정 시작: id={}, newLastReadAt={}", readStatusId, newLastReadAt);
     
     ReadStatus readStatus = readStatusRepository.findById(readStatusId)
         .orElseThrow(() -> ReadStatusNotFoundException.withId(readStatusId));
-    readStatus.update(request.newLastReadAt());
+    readStatus.update(newLastReadAt);
     
     log.info("읽음 상태 수정 완료: id={}", readStatusId);
     return readStatusMapper.toDto(readStatus);
@@ -101,5 +102,13 @@ public class BasicReadStatusService implements ReadStatusService {
     }
     readStatusRepository.deleteById(readStatusId);
     log.info("읽음 상태 삭제 완료: id={}", readStatusId);
+  }
+
+  private Instant clampToNow(Instant timestamp) {
+    if (timestamp == null) {
+      return null;
+    }
+    Instant now = Instant.now();
+    return timestamp.isAfter(now) ? now : timestamp;
   }
 }

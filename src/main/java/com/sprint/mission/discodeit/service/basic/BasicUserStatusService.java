@@ -44,7 +44,7 @@ public class BasicUserStatusService implements UserStatusService {
             throw DuplicateUserStatusException.withUserId(userId);
         });
 
-    Instant lastActiveAt = request.lastActiveAt();
+    Instant lastActiveAt = clampToNow(request.lastActiveAt());
     UserStatus userStatus = new UserStatus(user, lastActiveAt);
     userStatusRepository.save(userStatus);
     
@@ -75,7 +75,7 @@ public class BasicUserStatusService implements UserStatusService {
   @Transactional
   @Override
   public UserStatusDto update(UUID userStatusId, UserStatusUpdateRequest request) {
-    Instant newLastActiveAt = request.newLastActiveAt();
+    Instant newLastActiveAt = clampToNow(request.newLastActiveAt());
     log.debug("사용자 상태 수정 시작: id={}, newLastActiveAt={}", 
         userStatusId, newLastActiveAt);
     
@@ -90,7 +90,7 @@ public class BasicUserStatusService implements UserStatusService {
   @Transactional
   @Override
   public UserStatusDto updateByUserId(UUID userId, UserStatusUpdateRequest request) {
-    Instant newLastActiveAt = request.newLastActiveAt();
+    Instant newLastActiveAt = clampToNow(request.newLastActiveAt());
     log.debug("사용자 ID로 상태 수정 시작: userId={}, newLastActiveAt={}", 
         userId, newLastActiveAt);
     
@@ -111,5 +111,13 @@ public class BasicUserStatusService implements UserStatusService {
     }
     userStatusRepository.deleteById(userStatusId);
     log.info("사용자 상태 삭제 완료: id={}", userStatusId);
+  }
+
+  private Instant clampToNow(Instant timestamp) {
+    if (timestamp == null) {
+      return null;
+    }
+    Instant now = Instant.now();
+    return timestamp.isAfter(now) ? now : timestamp;
   }
 }
