@@ -1,27 +1,40 @@
-# build stage
-FROM gradle:8.10-jdk17 AS build
+# 빌드 스테이지
+FROM amazoncorretto:17 AS builder
+
+# 작업 디렉토리 설정
 WORKDIR /app
 
-# 캐시 최적화: 의존성 관련 파일 먼저 복사
-COPY gradlew .
-COPY gradle gradle
-COPY build.gradle .
-COPY settings.gradle .
+# Gradle Wrapper 파일 먼저 복사
+COPY gradle ./gradle
+COPY gradlew ./gradlew
 
-RUN chmod +x gradlew
-RUN ./gradlew dependencies --no-daemon || true
+# Gradle 캐시를 위한 의존성 파일 복사
+COPY build.gradle settings.gradle ./
 
-# 소스는 마지막에 복사
-COPY src src
+# 의존성 다운로드
+RUN ./gradlew dependencies
 
-# jar 빌드
-RUN ./gradlew bootJar --no-daemon
+# 소스 코드 복사 및 빌드
+COPY src ./src
+RUN ./gradlew build -x test
 
-# runtime stage
-FROM amazoncorretto:17-alpine-jdk
+
+# 런타임 스테이지
+FROM amazoncorretto:17-alpine3.21
+
+# 작업 디렉토리 설정
 WORKDIR /app
 
-COPY --from=build /app/build/libs/*.jar app.jar
+# 프로젝트 정보를 ENV로 설정
+ENV PROJECT_NAME=discodeit \
+    PROJECT_VERSION=1.2-M8 \
+    JVM_OPTS=""
 
+# 빌드 스테이지에서 jar 파일만 복사
+COPY --from=builder /app/build/libs/${PROJECT_NAME}-${PROJECT_VERSION}.jar ./
+
+# 80 포트 노출
 EXPOSE 80
-ENTRYPOINT ["java", "-jar", "app.jar"]
+
+# jar 파일 실행
+ENTRYPOINT ["sh", "-c", "java ${JVM_OPTS} -jar ${PROJECT_NAME}-${PROJECT_VERSION}.jar"]

@@ -44,9 +44,7 @@ bin/
 ### 숨김 파일 ###
 .*
 !.gitignore
+
+
+### Github Actions ###
 !.github/
-!.github/workflows/
-!.github/workflows/*.yml
-### 환경 파일 ###
-.env
-discodeit.env

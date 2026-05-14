@@ -26,14 +26,7 @@ public class DiscodeitException extends RuntimeException {
         this.details = new HashMap<>();
     }
 
-    public DiscodeitException(ErrorCode errorCode, Map<String, Object> details) {
-        super(errorCode.getMessage());
-        this.timestamp = Instant.now();
-        this.errorCode = errorCode;
-        this.details = new HashMap<>(details);
-    }
-
     public void addDetail(String key, Object value) {
         this.details.put(key, value);
     }
-}
+} 

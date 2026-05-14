@@ -27,7 +27,7 @@ public class BasicBinaryContentService implements BinaryContentService {
   @Transactional
   @Override
   public BinaryContentDto create(BinaryContentCreateRequest request) {
-    log.debug("바이너리 컨텐츠 생성 시작: fileName={}, size={}, contentType={}",
+    log.debug("바이너리 컨텐츠 생성 시작: fileName={}, size={}, contentType={}", 
         request.fileName(), request.bytes().length, request.contentType());
 
     String fileName = request.fileName();
@@ -39,9 +39,9 @@ public class BasicBinaryContentService implements BinaryContentService {
         contentType
     );
     binaryContentRepository.save(binaryContent);
-    binaryContentStorageSupport.put(binaryContent.getId(), bytes);
+    binaryContentStorage.put(binaryContent.getId(), bytes);
 
-    log.info("바이너리 컨텐츠 생성 완료: id={}, fileName={}, size={}",
+    log.info("바이너리 컨텐츠 생성 완료: id={}, fileName={}, size={}", 
         binaryContent.getId(), fileName, bytes.length);
     return binaryContentMapper.toDto(binaryContent);
   }
@@ -52,7 +52,7 @@ public class BasicBinaryContentService implements BinaryContentService {
     BinaryContentDto dto = binaryContentRepository.findById(binaryContentId)
         .map(binaryContentMapper::toDto)
         .orElseThrow(() -> BinaryContentNotFoundException.withId(binaryContentId));
-    log.info("바이너리 컨텐츠 조회 완료: id={}, fileName={}",
+    log.info("바이너리 컨텐츠 조회 완료: id={}, fileName={}", 
         dto.id(), dto.fileName());
     return dto;
   }
@@ -71,10 +71,10 @@ public class BasicBinaryContentService implements BinaryContentService {
   @Override
   public void delete(UUID binaryContentId) {
     log.debug("바이너리 컨텐츠 삭제 시작: id={}", binaryContentId);
-    BinaryContent binaryContent = binaryContentRepository.findById(binaryContentId)
-        .orElseThrow(() -> BinaryContentNotFoundException.withId(binaryContentId));
-    binaryContentRepository.delete(binaryContent);
-    binaryContentStorageSupport.deleteAfterCommit(binaryContentId);
+    if (!binaryContentRepository.existsById(binaryContentId)) {
+      throw BinaryContentNotFoundException.withId(binaryContentId);
+    }
+    binaryContentRepository.deleteById(binaryContentId);
     log.info("바이너리 컨텐츠 삭제 완료: id={}", binaryContentId);
   }
 }

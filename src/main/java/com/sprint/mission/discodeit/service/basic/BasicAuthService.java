@@ -12,7 +12,6 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.security.crypto.password.PasswordEncoder;
 
 @Slf4j
 @RequiredArgsConstructor
@@ -34,7 +33,7 @@ public class BasicAuthService implements AuthService {
     User user = userRepository.findByUsername(username)
         .orElseThrow(() -> UserNotFoundException.withUsername(username));
 
-    if (!passwordEncoder.matches(password, user.getPassword())) {
+    if (!user.getPassword().equals(password)) {
       throw InvalidCredentialsException.wrongPassword();
     }
 

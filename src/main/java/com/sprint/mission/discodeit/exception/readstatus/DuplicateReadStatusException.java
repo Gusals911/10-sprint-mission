@@ -15,4 +15,4 @@ public class DuplicateReadStatusException extends ReadStatusException {
         exception.addDetail("channelId", channelId);
         return exception;
     }
-}
+} 

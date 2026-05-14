@@ -19,17 +19,17 @@ import com.sprint.mission.discodeit.repository.ChannelRepository;
 import com.sprint.mission.discodeit.repository.MessageRepository;
 import com.sprint.mission.discodeit.repository.UserRepository;
 import com.sprint.mission.discodeit.service.MessageService;
-import com.sprint.mission.discodeit.storage.BinaryContentStorageSupport;
+import com.sprint.mission.discodeit.storage.BinaryContentStorage;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Slice;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
 @Service
@@ -40,7 +40,7 @@ public class BasicMessageService implements MessageService {
   private final ChannelRepository channelRepository;
   private final UserRepository userRepository;
   private final MessageMapper messageMapper;
-  private final BinaryContentStorageSupport binaryContentStorageSupport;
+  private final BinaryContentStorage binaryContentStorage;
   private final BinaryContentRepository binaryContentRepository;
   private final PageResponseMapper pageResponseMapper;
 
@@ -58,7 +58,17 @@ public class BasicMessageService implements MessageService {
         .orElseThrow(() -> UserNotFoundException.withId(authorId));
 
     List<BinaryContent> attachments = binaryContentCreateRequests.stream()
-        .map(this::saveBinaryContent)
+        .map(attachmentRequest -> {
+          String fileName = attachmentRequest.fileName();
+          String contentType = attachmentRequest.contentType();
+          byte[] bytes = attachmentRequest.bytes();
+
+          BinaryContent binaryContent = new BinaryContent(fileName, (long) bytes.length,
+              contentType);
+          binaryContentRepository.save(binaryContent);
+          binaryContentStorage.put(binaryContent.getId(), bytes);
+          return binaryContent;
+        })
         .toList();
 
     String content = messageCreateRequest.content();
@@ -84,10 +94,10 @@ public class BasicMessageService implements MessageService {
 
   @Transactional(readOnly = true)
   @Override
-  public PageResponse<MessageDto> findAllByChannelId(UUID channelId, Instant createdAt,
+  public PageResponse<MessageDto> findAllByChannelId(UUID channelId, Instant createAt,
       Pageable pageable) {
     Slice<MessageDto> slice = messageRepository.findAllByChannelIdWithAuthor(channelId,
-            Optional.ofNullable(createdAt).orElse(Instant.now()),
+            Optional.ofNullable(createAt).orElse(Instant.now()),
             pageable)
         .map(messageMapper::toDto);
 
@@ -116,23 +126,10 @@ public class BasicMessageService implements MessageService {
   @Override
   public void delete(UUID messageId) {
     log.debug("메시지 삭제 시작: id={}", messageId);
-    Message message = messageRepository.findByIdWithAttachments(messageId)
-        .orElseThrow(() -> MessageNotFoundException.withId(messageId));
-    message.getAttachments().stream()
-        .map(BinaryContent::getId)
-        .forEach(binaryContentStorageSupport::deleteAfterCommit);
-    messageRepository.delete(message);
+    if (!messageRepository.existsById(messageId)) {
+      throw MessageNotFoundException.withId(messageId);
+    }
+    messageRepository.deleteById(messageId);
     log.info("메시지 삭제 완료: id={}", messageId);
-  }
-
-  private BinaryContent saveBinaryContent(BinaryContentCreateRequest request) {
-    BinaryContent binaryContent = new BinaryContent(
-        request.fileName(),
-        (long) request.bytes().length,
-        request.contentType()
-    );
-    binaryContentRepository.save(binaryContent);
-    binaryContentStorageSupport.put(binaryContent.getId(), request.bytes());
-    return binaryContent;
   }
 }
