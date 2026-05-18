@@ -5,6 +5,7 @@ import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.notNullValue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -115,6 +116,33 @@ class AuthApiIntegrationTest {
         .andExpect(status().isUnauthorized());
   }
 
+  @Test
+  @DisplayName("로그아웃 API 통합 테스트 - 성공")
+  void logout_Success() throws Exception {
+    UserCreateRequest userRequest = new UserCreateRequest(
+        "logoutuser",
+        "logout@example.com",
+        "Password1!"
+    );
+    userService.create(userRequest, Optional.empty());
+
+    MvcResult loginResult = performLogin("logoutuser", "Password1!")
+        .andExpect(status().isOk())
+        .andReturn();
+    MockHttpSession session = (MockHttpSession) loginResult.getRequest().getSession(false);
+    assertThat(session).isNotNull();
+
+    Cookie csrfCookie = getCsrfCookie(session);
+
+    mockMvc.perform(post("/api/auth/logout")
+            .session(session)
+            .cookie(csrfCookie)
+            .header("X-XSRF-TOKEN", csrfCookie.getValue()))
+        .andExpect(status().isNoContent());
+
+    assertThat(session.isInvalid()).isTrue();
+  }
+
   private ResultActions performLogin(String username, String password) throws Exception {
     Cookie csrfCookie = getCsrfCookie();
 
@@ -127,6 +155,17 @@ class AuthApiIntegrationTest {
 
   private Cookie getCsrfCookie() throws Exception {
     MvcResult result = mockMvc.perform(get("/api/auth/csrf-token"))
+        .andExpect(status().isNonAuthoritativeInformation())
+        .andReturn();
+
+    Cookie csrfCookie = result.getResponse().getCookie("XSRF-TOKEN");
+    assertThat(csrfCookie).isNotNull();
+    return csrfCookie;
+  }
+
+  private Cookie getCsrfCookie(MockHttpSession session) throws Exception {
+    MvcResult result = mockMvc.perform(get("/api/auth/csrf-token")
+            .session(session))
         .andExpect(status().isNonAuthoritativeInformation())
         .andReturn();
 
