@@ -4,7 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.notNullValue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -17,8 +17,8 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.http.MediaType;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.mock.web.MockHttpSession;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.ResultActions;
@@ -84,13 +84,43 @@ class AuthApiIntegrationTest {
         .andExpect(jsonPath("$.status", is(401)));
   }
 
+  @Test
+  @DisplayName("현재 사용자 정보 조회 API 통합 테스트 - 성공")
+  void me_Success() throws Exception {
+    UserCreateRequest userRequest = new UserCreateRequest(
+        "meuser",
+        "me@example.com",
+        "Password1!"
+    );
+    userService.create(userRequest, Optional.empty());
+
+    MvcResult loginResult = performLogin("meuser", "Password1!")
+        .andExpect(status().isOk())
+        .andReturn();
+    MockHttpSession session = (MockHttpSession) loginResult.getRequest().getSession(false);
+    assertThat(session).isNotNull();
+
+    mockMvc.perform(get("/api/auth/me")
+            .session(session))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.id", notNullValue()))
+        .andExpect(jsonPath("$.username", is("meuser")))
+        .andExpect(jsonPath("$.email", is("me@example.com")));
+  }
+
+  @Test
+  @DisplayName("현재 사용자 정보 조회 API 통합 테스트 - 인증되지 않은 요청")
+  void me_Failure_Unauthenticated() throws Exception {
+    mockMvc.perform(get("/api/auth/me"))
+        .andExpect(status().isUnauthorized());
+  }
+
   private ResultActions performLogin(String username, String password) throws Exception {
     Cookie csrfCookie = getCsrfCookie();
 
-    return mockMvc.perform(post("/api/auth/login")
+    return mockMvc.perform(multipart("/api/auth/login")
         .cookie(csrfCookie)
         .header("X-XSRF-TOKEN", csrfCookie.getValue())
-        .contentType(MediaType.APPLICATION_FORM_URLENCODED)
         .param("username", username)
         .param("password", password));
   }
