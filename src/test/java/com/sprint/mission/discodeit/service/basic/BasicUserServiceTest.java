@@ -22,8 +22,10 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.util.ReflectionTestUtils;
 
 @ExtendWith(MockitoExtension.class)
@@ -34,6 +36,9 @@ class BasicUserServiceTest {
 
   @Mock
   private UserMapper userMapper;
+
+  @Mock
+  private PasswordEncoder passwordEncoder;
 
   @InjectMocks
   private BasicUserService userService;
@@ -62,8 +67,10 @@ class BasicUserServiceTest {
   void createUser_Success() {
     // given
     UserCreateRequest request = new UserCreateRequest(username, email, password);
+    String encodedPassword = "encodedPassword";
     given(userRepository.existsByEmail(eq(email))).willReturn(false);
     given(userRepository.existsByUsername(eq(username))).willReturn(false);
+    given(passwordEncoder.encode(password)).willReturn(encodedPassword);
     given(userMapper.toDto(any(User.class))).willReturn(userDto);
 
     // when
@@ -71,7 +78,10 @@ class BasicUserServiceTest {
 
     // then
     assertThat(result).isEqualTo(userDto);
-    verify(userRepository).save(any(User.class));
+    ArgumentCaptor<User> userCaptor = ArgumentCaptor.forClass(User.class);
+    verify(userRepository).save(userCaptor.capture());
+    assertThat(userCaptor.getValue().getPassword()).isEqualTo(encodedPassword);
+    verify(passwordEncoder).encode(password);
   }
 
   @Test
@@ -131,11 +141,13 @@ class BasicUserServiceTest {
     String newUsername = "newUsername";
     String newEmail = "new@example.com";
     String newPassword = "newPassword";
+    String encodedPassword = "encodedNewPassword";
     UserUpdateRequest request = new UserUpdateRequest(newUsername, newEmail, newPassword);
 
     given(userRepository.findById(eq(userId))).willReturn(Optional.of(user));
     given(userRepository.existsByEmail(eq(newEmail))).willReturn(false);
     given(userRepository.existsByUsername(eq(newUsername))).willReturn(false);
+    given(passwordEncoder.encode(newPassword)).willReturn(encodedPassword);
     given(userMapper.toDto(any(User.class))).willReturn(userDto);
 
     // when
@@ -143,6 +155,8 @@ class BasicUserServiceTest {
 
     // then
     assertThat(result).isEqualTo(userDto);
+    assertThat(user.getPassword()).isEqualTo(encodedPassword);
+    verify(passwordEncoder).encode(newPassword);
   }
 
   @Test
