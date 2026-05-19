@@ -20,16 +20,21 @@ public class SecurityConfig {
             LoginSuccessHandler loginSuccessHandler,
             LoginFailureHandler loginFailureHandler
     ) throws Exception {
-
+        // Security 필터 체인 설정 빌더
         http
+                // CSR 방식에서 JS가 쿠키에 포함된 CSRF 토큰에 접근 가능하도록 HttpOnly 설정 해제
                 .csrf(csrf -> csrf.csrfTokenRepository(CookieCsrfTokenRepository.withHttpOnlyFalse())
+                        // 토큰 지연 로딩 문제 해결을 위해 커스텀 핸들러 사용
                         .csrfTokenRequestHandler(new SpaCsrfTokenRequestHandler()))
+                // 로그인된 사용자만 auth/me 에 접근할 수 있도록 검사
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/api/auth/me").authenticated()
+                        // 나머지 요청은 모두 허용
                         .anyRequest().permitAll())
                 .exceptionHandling(exception -> exception
                         .authenticationEntryPoint((request, response, authException) ->
                                 response.sendError(HttpServletResponse.SC_UNAUTHORIZED)))
+                // 로그인 필터 - 로그인 엔드포인트, 성공/실패시 연결될 핸들러 커스터마이징
                 .formLogin(login -> login
                         .loginProcessingUrl("/api/auth/login")
                         .successHandler(loginSuccessHandler)

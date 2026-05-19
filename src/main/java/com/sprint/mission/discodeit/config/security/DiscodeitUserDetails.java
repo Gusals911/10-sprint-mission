@@ -12,7 +12,7 @@ import org.springframework.security.core.userdetails.UserDetails;
 @Getter
 @RequiredArgsConstructor
 public class DiscodeitUserDetails implements UserDetails {
-
+  // UserDto 응답
   private final UserDto userDto;
   private final String password;
 

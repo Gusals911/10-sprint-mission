@@ -25,6 +25,7 @@ public class LoginFailureHandler implements AuthenticationFailureHandler {
       HttpServletResponse response,
       AuthenticationException exception
   ) throws IOException, ServletException {
+    // 로그인 실패시 Exception 응답
     ErrorResponse errorResponse = new ErrorResponse(exception, HttpServletResponse.SC_UNAUTHORIZED);
 
     response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);

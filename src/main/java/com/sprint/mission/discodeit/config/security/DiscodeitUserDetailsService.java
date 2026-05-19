@@ -13,7 +13,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 @RequiredArgsConstructor
 public class DiscodeitUserDetailsService implements UserDetailsService {
-
+  // DB를 사용하여 사용자를 인증하도록 변경
   private final UserRepository userRepository;
   private final UserMapper userMapper;
 

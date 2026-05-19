@@ -24,6 +24,7 @@ public class LoginSuccessHandler implements AuthenticationSuccessHandler {
       HttpServletResponse response,
       Authentication authentication
   ) throws IOException, ServletException {
+    // 로그인 성공시 UserDto JSON 응답
     DiscodeitUserDetails userDetails = (DiscodeitUserDetails) authentication.getPrincipal();
 
     response.setStatus(HttpServletResponse.SC_OK);
