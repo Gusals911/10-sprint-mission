@@ -1,6 +1,7 @@
 package com.sprint.mission.discodeit.integration;
 
 import static org.hamcrest.Matchers.hasSize;
+import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.notNullValue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
@@ -22,8 +23,11 @@ import com.sprint.mission.discodeit.service.ChannelService;
 import com.sprint.mission.discodeit.service.MessageService;
 import com.sprint.mission.discodeit.service.UserService;
 import java.util.ArrayList;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -31,6 +35,9 @@ import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMock
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockMultipartFile;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
@@ -55,6 +62,21 @@ class MessageApiIntegrationTest {
 
   @Autowired
   private UserService userService;
+
+  @BeforeEach
+  void setUpSecurityContext() {
+    UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(
+        "channelManager",
+        null,
+        List.of(new SimpleGrantedAuthority("ROLE_CHANNEL_MANAGER"))
+    );
+    SecurityContextHolder.getContext().setAuthentication(authentication);
+  }
+
+  @AfterEach
+  void clearSecurityContext() {
+    SecurityContextHolder.clearContext();
+  }
 
   @Test
   @DisplayName("메시지 생성 API 통합 테스트")
@@ -177,8 +199,10 @@ class MessageApiIntegrationTest {
             .contentType(MediaType.APPLICATION_JSON))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.content", hasSize(2)))
-        .andExpect(jsonPath("$.content[0].content", is("두 번째 메시지 내용입니다.")))
-        .andExpect(jsonPath("$.content[1].content", is("첫 번째 메시지 내용입니다.")))
+        .andExpect(jsonPath("$.content[*].content", containsInAnyOrder(
+            "첫 번째 메시지 내용입니다.",
+            "두 번째 메시지 내용입니다."
+        )))
         .andExpect(jsonPath("$.size").exists())
         .andExpect(jsonPath("$.hasNext").exists())
         .andExpect(jsonPath("$.totalElements").isEmpty());

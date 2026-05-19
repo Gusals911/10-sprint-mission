@@ -3,8 +3,13 @@ package com.sprint.mission.discodeit.config.security;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpMethod;
+import org.springframework.http.HttpStatus;
+import org.springframework.security.access.expression.method.DefaultMethodSecurityExpressionHandler;
+import org.springframework.security.access.expression.method.MethodSecurityExpressionHandler;
+import org.springframework.security.access.hierarchicalroles.RoleHierarchy;
+import org.springframework.security.access.hierarchicalroles.RoleHierarchyImpl;
+import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -13,44 +18,74 @@ import org.springframework.security.web.authentication.logout.HttpStatusReturnin
 import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
 
 @Configuration
+@EnableMethodSecurity
 public class SecurityConfig {
 
-    @Bean
-    public SecurityFilterChain filterChain(
-            HttpSecurity http,
-            LoginSuccessHandler loginSuccessHandler,
-            LoginFailureHandler loginFailureHandler
-    ) throws Exception {
-        // Security 필터 체인 설정 빌더
-        http
-                // CSR 방식에서 JS가 쿠키에 포함된 CSRF 토큰에 접근 가능하도록 HttpOnly 설정 해제
-                .csrf(csrf -> csrf.csrfTokenRepository(CookieCsrfTokenRepository.withHttpOnlyFalse())
-                        // 토큰 지연 로딩 문제 해결을 위해 커스텀 핸들러 사용
-                        .csrfTokenRequestHandler(new SpaCsrfTokenRequestHandler()))
-                .authorizeHttpRequests(auth -> auth
-                        // 권한 수정 요청은 ADMIN 권한 필요
-                        .requestMatchers(HttpMethod.PUT, "/api/auth/role").hasRole("ADMIN")
-                        // 로그인된 사용자만 auth/me 에 접근할 수 있도록 검사
-                        .requestMatchers("/api/auth/me").authenticated()
-                        // 나머지 요청은 모두 허용
-                        .anyRequest().permitAll())
-                .exceptionHandling(exception -> exception
-                        .authenticationEntryPoint((request, response, authException) ->
-                                response.sendError(HttpServletResponse.SC_UNAUTHORIZED)))
-                // 로그인 필터 - 로그인 엔드포인트, 성공/실패시 연결될 핸들러 커스터마이징
-                .formLogin(login -> login
-                        .loginProcessingUrl("/api/auth/login")
-                        .successHandler(loginSuccessHandler)
-                        .failureHandler(loginFailureHandler))
-                .logout(logout -> logout
-                        .logoutUrl("/api/auth/logout")
-                        .logoutSuccessHandler(
-                                new HttpStatusReturningLogoutSuccessHandler(HttpStatus.NO_CONTENT)));
-        return http.build();
-    }
+  @Bean
+  public SecurityFilterChain filterChain(
+      HttpSecurity http,
+      LoginSuccessHandler loginSuccessHandler,
+      LoginFailureHandler loginFailureHandler
+  ) throws Exception {
+    http
+        // CSR 방식에서 JavaScript가 CSRF 토큰 쿠키를 읽을 수 있도록 HttpOnly를 해제
+        .csrf(csrf -> csrf.csrfTokenRepository(CookieCsrfTokenRepository.withHttpOnlyFalse())
+            // CSRF 토큰 지연 로딩 문제를 해결하기 위해 커스텀 핸들러 사용
+            .csrfTokenRequestHandler(new SpaCsrfTokenRequestHandler()))
+        .authorizeHttpRequests(auth -> auth
+            // 인증 없이 접근해야 하는 인증 준비 요청
+            .requestMatchers(HttpMethod.GET, "/api/auth/csrf-token").permitAll()
+            .requestMatchers(HttpMethod.POST, "/api/auth/login").permitAll()
+            .requestMatchers(HttpMethod.POST, "/api/auth/logout").permitAll()
+            .requestMatchers(HttpMethod.POST, "/api/users").permitAll()
+            // 프론트 정적 리소스와 API 문서, 모니터링 요청은 인증 없이 허용
+            .requestMatchers("/", "/index.html", "/favicon.ico", "/assets/**").permitAll()
+            .requestMatchers("/swagger-ui/**", "/swagger-ui.html", "/v3/api-docs/**").permitAll()
+            .requestMatchers("/actuator/**").permitAll()
+            // 권한 수정 요청은 ADMIN 권한 필요
+            .requestMatchers(HttpMethod.PUT, "/api/auth/role").hasRole("ADMIN")
+            // 그 외 모든 요청은 인증(로그인) 필요
+            .anyRequest().authenticated())
+        .exceptionHandling(exception -> exception
+            // 인증되지 않은 사용자는 401 응답
+            .authenticationEntryPoint((request, response, authException) ->
+                response.sendError(HttpServletResponse.SC_UNAUTHORIZED))
+            // 인증은 되었지만 권한이 부족한 사용자는 403 응답
+            .accessDeniedHandler((request, response, accessDeniedException) ->
+                response.sendError(HttpServletResponse.SC_FORBIDDEN)))
+        // 로그인 필터는 Spring Security 기본 흐름을 사용하고 성공/실패 응답만 커스터마이징
+        .formLogin(login -> login
+            .loginProcessingUrl("/api/auth/login")
+            .successHandler(loginSuccessHandler)
+            .failureHandler(loginFailureHandler))
+        .logout(logout -> logout
+            .logoutUrl("/api/auth/logout")
+            .logoutSuccessHandler(
+                new HttpStatusReturningLogoutSuccessHandler(HttpStatus.NO_CONTENT)));
 
-    @Bean
-    public PasswordEncoder passwordEncoder() {
-        return new BCryptPasswordEncoder();
-    }
+    return http.build();
+  }
+
+  @Bean
+  public PasswordEncoder passwordEncoder() {
+    return new BCryptPasswordEncoder();
+  }
+
+  @Bean
+  public RoleHierarchy roleHierarchy() {
+    return RoleHierarchyImpl.fromHierarchy("""
+        ROLE_ADMIN > ROLE_CHANNEL_MANAGER
+        ROLE_CHANNEL_MANAGER > ROLE_USER
+        """);
+  }
+
+  @Bean
+  static MethodSecurityExpressionHandler methodSecurityExpressionHandler(
+      RoleHierarchy roleHierarchy
+  ) {
+    DefaultMethodSecurityExpressionHandler handler = new DefaultMethodSecurityExpressionHandler();
+    // 메서드 권한 검사에서도 권한 계층을 반영
+    handler.setRoleHierarchy(roleHierarchy);
+    return handler;
+  }
 }

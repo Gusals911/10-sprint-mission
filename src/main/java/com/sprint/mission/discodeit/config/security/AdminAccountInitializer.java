@@ -27,7 +27,6 @@ public class AdminAccountInitializer implements ApplicationRunner {
 
   @Transactional
   @Override
-  // 애플리케이션 최초 실행시 자동 호출
   public void run(ApplicationArguments args) {
     if (userRepository.existsByRole(Role.ADMIN)) {
       log.debug("ADMIN 계정이 이미 존재합니다.");

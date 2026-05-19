@@ -13,7 +13,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 @RequiredArgsConstructor
 public class DiscodeitUserDetailsService implements UserDetailsService {
-  // DB를 사용하여 사용자를 인증하도록 변경
+
   private final UserRepository userRepository;
   private final UserMapper userMapper;
 
@@ -22,7 +22,7 @@ public class DiscodeitUserDetailsService implements UserDetailsService {
   public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
     User user = userRepository.findByUsername(username)
         .orElseThrow(() -> new UsernameNotFoundException(
-            "User with username " + username + " not found"));
+            "사용자를 찾을 수 없습니다: username=" + username));
 
     return new DiscodeitUserDetails(userMapper.toDto(user), user.getPassword());
   }
