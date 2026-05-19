@@ -1,9 +1,11 @@
 package com.sprint.mission.discodeit.controller;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.mock;
 
 import com.sprint.mission.discodeit.config.security.DiscodeitUserDetails;
 import com.sprint.mission.discodeit.dto.data.UserDto;
+import com.sprint.mission.discodeit.service.UserService;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -16,7 +18,7 @@ class AuthControllerTest {
   @Test
   @DisplayName("CSRF 토큰 요청 시 203 상태를 반환한다")
   void getCsrfToken_ReturnsNonAuthoritativeInformation() {
-    AuthController authController = new AuthController();
+    AuthController authController = authController();
     DefaultCsrfToken csrfToken = new DefaultCsrfToken("X-XSRF-TOKEN", "_csrf", "test-token");
 
     ResponseEntity<Void> response = authController.getCsrfToken(csrfToken);
@@ -43,6 +45,6 @@ class AuthControllerTest {
   }
 
   private AuthController authController() {
-    return new AuthController();
+    return new AuthController(mock(UserService.class));
   }
 }

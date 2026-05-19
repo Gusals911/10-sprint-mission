@@ -18,7 +18,8 @@ public class DiscodeitUserDetails implements UserDetails {
 
   @Override
   public Collection<? extends GrantedAuthority> getAuthorities() {
-    return List.of(new SimpleGrantedAuthority("ROLE_USER"));
+    // 사용자 권한을 Spring Security 권한 형식으로 변환
+    return List.of(new SimpleGrantedAuthority("ROLE_" + userDto.role().name()));
   }
 
   @Override

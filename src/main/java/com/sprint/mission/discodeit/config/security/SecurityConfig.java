@@ -4,6 +4,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -26,8 +27,10 @@ public class SecurityConfig {
                 .csrf(csrf -> csrf.csrfTokenRepository(CookieCsrfTokenRepository.withHttpOnlyFalse())
                         // 토큰 지연 로딩 문제 해결을 위해 커스텀 핸들러 사용
                         .csrfTokenRequestHandler(new SpaCsrfTokenRequestHandler()))
-                // 로그인된 사용자만 auth/me 에 접근할 수 있도록 검사
                 .authorizeHttpRequests(auth -> auth
+                        // 권한 수정 요청은 ADMIN 권한 필요
+                        .requestMatchers(HttpMethod.PUT, "/api/auth/role").hasRole("ADMIN")
+                        // 로그인된 사용자만 auth/me 에 접근할 수 있도록 검사
                         .requestMatchers("/api/auth/me").authenticated()
                         // 나머지 요청은 모두 허용
                         .anyRequest().permitAll())

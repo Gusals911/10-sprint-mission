@@ -1,6 +1,7 @@
 package com.sprint.mission.discodeit.integration;
 
 import static org.hamcrest.Matchers.hasSize;
+import static org.hamcrest.Matchers.hasItem;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.notNullValue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
@@ -131,11 +132,10 @@ class UserApiIntegrationTest {
     mockMvc.perform(get("/api/users")
             .contentType(MediaType.APPLICATION_JSON))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$", hasSize(2)))
-        .andExpect(jsonPath("$[0].username", is("user1")))
-        .andExpect(jsonPath("$[0].email", is("user1@example.com")))
-        .andExpect(jsonPath("$[1].username", is("user2")))
-        .andExpect(jsonPath("$[1].email", is("user2@example.com")));
+        .andExpect(jsonPath("$", hasSize(3)))
+        .andExpect(jsonPath("$[?(@.username == 'admin')].email", hasItem("admin@discodeit.com")))
+        .andExpect(jsonPath("$[?(@.username == 'user1')].email", hasItem("user1@example.com")))
+        .andExpect(jsonPath("$[?(@.username == 'user2')].email", hasItem("user2@example.com")));
   }
 
   @Test
