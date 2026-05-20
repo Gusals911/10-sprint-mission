@@ -39,7 +39,7 @@ public class AuthController {
   public ResponseEntity<UserDto> me(@AuthenticationPrincipal DiscodeitUserDetails userDetails) {
     return ResponseEntity
         .status(HttpStatus.OK)
-        .body(userDetails.getUserDto());
+        .body(userDetails.toAuthenticatedUserDto());
   }
 
   @PutMapping(path = "role")

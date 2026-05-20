@@ -11,11 +11,14 @@ import org.springframework.security.access.hierarchicalroles.RoleHierarchy;
 import org.springframework.security.access.hierarchicalroles.RoleHierarchyImpl;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.core.session.SessionRegistry;
+import org.springframework.security.core.session.SessionRegistryImpl;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.logout.HttpStatusReturningLogoutSuccessHandler;
 import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
+import org.springframework.security.web.session.HttpSessionEventPublisher;
 
 @Configuration
 @EnableMethodSecurity
@@ -25,7 +28,8 @@ public class SecurityConfig {
   public SecurityFilterChain filterChain(
       HttpSecurity http,
       LoginSuccessHandler loginSuccessHandler,
-      LoginFailureHandler loginFailureHandler
+      LoginFailureHandler loginFailureHandler,
+      SessionRegistry sessionRegistry
   ) throws Exception {
     http
         // CSR 방식에서 JavaScript가 CSRF 토큰 쿠키를 읽을 수 있도록 HttpOnly를 해제
@@ -53,6 +57,14 @@ public class SecurityConfig {
             // 인증은 되었지만 권한이 부족한 사용자는 403 응답
             .accessDeniedHandler((request, response, accessDeniedException) ->
                 response.sendError(HttpServletResponse.SC_FORBIDDEN)))
+        .sessionManagement(management -> management
+            .sessionConcurrency(concurrency -> concurrency
+                // 동일 계정으로 유지할 수 있는 로그인 세션을 1개로 제한
+                .maximumSessions(1)
+                // 이미 로그인한 계정의 추가 로그인은 거부
+                .maxSessionsPreventsLogin(true)
+                // 동시 로그인 제한과 강제 세션 만료 처리에서 같은 세션 저장소를 사용
+                .sessionRegistry(sessionRegistry)))
         // 로그인 필터는 Spring Security 기본 흐름을 사용하고 성공/실패 응답만 커스터마이징
         .formLogin(login -> login
             .loginProcessingUrl("/api/auth/login")
@@ -69,6 +81,18 @@ public class SecurityConfig {
   @Bean
   public PasswordEncoder passwordEncoder() {
     return new BCryptPasswordEncoder();
+  }
+
+  @Bean
+  public SessionRegistry sessionRegistry() {
+    // 현재 로그인한 Principal과 세션 정보를 추적
+    return new SessionRegistryImpl();
+  }
+
+  @Bean
+  public HttpSessionEventPublisher httpSessionEventPublisher() {
+    // HttpSession 만료/소멸 이벤트를 SessionRegistry에 반영
+    return new HttpSessionEventPublisher();
   }
 
   @Bean

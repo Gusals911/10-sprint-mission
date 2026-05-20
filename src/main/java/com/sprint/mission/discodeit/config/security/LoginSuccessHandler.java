@@ -30,6 +30,6 @@ public class LoginSuccessHandler implements AuthenticationSuccessHandler {
     response.setStatus(HttpServletResponse.SC_OK);
     response.setContentType(MediaType.APPLICATION_JSON_VALUE);
     response.setCharacterEncoding(StandardCharsets.UTF_8.name());
-    objectMapper.writeValue(response.getWriter(), userDetails.getUserDto());
+    objectMapper.writeValue(response.getWriter(), userDetails.toAuthenticatedUserDto());
   }
 }
