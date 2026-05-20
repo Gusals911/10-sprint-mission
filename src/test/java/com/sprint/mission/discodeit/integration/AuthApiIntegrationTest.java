@@ -117,6 +117,50 @@ class AuthApiIntegrationTest {
   }
 
   @Test
+  @DisplayName("Remember-me 체크 로그인 시 remember-me 쿠키가 발급된다")
+  void login_WithRememberMe_IssuesRememberMeCookie() throws Exception {
+    UserCreateRequest userRequest = new UserCreateRequest(
+        "rememberuser",
+        "remember@example.com",
+        "Password1!"
+    );
+    userService.create(userRequest, Optional.empty());
+
+    MvcResult loginResult = performLogin("rememberuser", "Password1!", true)
+        .andExpect(status().isOk())
+        .andReturn();
+
+    Cookie rememberMeCookie = loginResult.getResponse().getCookie("remember-me");
+    assertThat(rememberMeCookie).isNotNull();
+    assertThat(rememberMeCookie.getMaxAge()).isGreaterThan(0);
+  }
+
+  @Test
+  @DisplayName("JSESSIONID 없이 remember-me 쿠키만으로 현재 사용자 정보를 조회할 수 있다")
+  void me_WithRememberMeCookieAndNoSession_Success() throws Exception {
+    UserCreateRequest userRequest = new UserCreateRequest(
+        "remembermeuser",
+        "remember-me@example.com",
+        "Password1!"
+    );
+    userService.create(userRequest, Optional.empty());
+
+    MvcResult loginResult = performLogin("remembermeuser", "Password1!", true)
+        .andExpect(status().isOk())
+        .andReturn();
+    Cookie rememberMeCookie = loginResult.getResponse().getCookie("remember-me");
+    assertThat(rememberMeCookie).isNotNull();
+
+    mockMvc.perform(get("/api/auth/me")
+            .cookie(rememberMeCookie))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.id", notNullValue()))
+        .andExpect(jsonPath("$.username", is("remembermeuser")))
+        .andExpect(jsonPath("$.email", is("remember-me@example.com")))
+        .andExpect(jsonPath("$.online", is(true)));
+  }
+
+  @Test
   @DisplayName("로그아웃 API 통합 테스트 - 성공")
   void logout_Success() throws Exception {
     UserCreateRequest userRequest = new UserCreateRequest(
@@ -143,14 +187,52 @@ class AuthApiIntegrationTest {
     assertThat(session.isInvalid()).isTrue();
   }
 
+  @Test
+  @DisplayName("Remember-me 로그인 후 로그아웃하면 remember-me 쿠키가 만료된다")
+  void logout_WithRememberMe_ExpiresRememberMeCookie() throws Exception {
+    UserCreateRequest userRequest = new UserCreateRequest(
+        "rememberlogoutuser",
+        "remember-logout@example.com",
+        "Password1!"
+    );
+    userService.create(userRequest, Optional.empty());
+
+    MvcResult loginResult = performLogin("rememberlogoutuser", "Password1!", true)
+        .andExpect(status().isOk())
+        .andReturn();
+    MockHttpSession session = (MockHttpSession) loginResult.getRequest().getSession(false);
+    Cookie rememberMeCookie = loginResult.getResponse().getCookie("remember-me");
+    assertThat(session).isNotNull();
+    assertThat(rememberMeCookie).isNotNull();
+
+    Cookie csrfCookie = getCsrfCookie(session);
+
+    MvcResult logoutResult = mockMvc.perform(post("/api/auth/logout")
+            .session(session)
+            .cookie(csrfCookie, rememberMeCookie)
+            .header("X-XSRF-TOKEN", csrfCookie.getValue()))
+        .andExpect(status().isNoContent())
+        .andReturn();
+
+    Cookie expiredRememberMeCookie = logoutResult.getResponse().getCookie("remember-me");
+    assertThat(expiredRememberMeCookie).isNotNull();
+    assertThat(expiredRememberMeCookie.getMaxAge()).isZero();
+  }
+
   private ResultActions performLogin(String username, String password) throws Exception {
+    return performLogin(username, password, false);
+  }
+
+  private ResultActions performLogin(String username, String password, boolean rememberMe)
+      throws Exception {
     Cookie csrfCookie = getCsrfCookie();
 
     return mockMvc.perform(multipart("/api/auth/login")
         .cookie(csrfCookie)
         .header("X-XSRF-TOKEN", csrfCookie.getValue())
         .param("username", username)
-        .param("password", password));
+        .param("password", password)
+        .param("remember-me", Boolean.toString(rememberMe)));
   }
 
   private Cookie getCsrfCookie() throws Exception {

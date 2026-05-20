@@ -13,6 +13,7 @@ import org.springframework.security.config.annotation.method.configuration.Enabl
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.core.session.SessionRegistry;
 import org.springframework.security.core.session.SessionRegistryImpl;
+import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
@@ -24,12 +25,16 @@ import org.springframework.security.web.session.HttpSessionEventPublisher;
 @EnableMethodSecurity
 public class SecurityConfig {
 
+  private static final String REMEMBER_ME_KEY = "discodeit-remember-me";
+  private static final int REMEMBER_ME_VALIDITY_SECONDS = 60 * 60 * 24 * 14;
+
   @Bean
   public SecurityFilterChain filterChain(
       HttpSecurity http,
       LoginSuccessHandler loginSuccessHandler,
       LoginFailureHandler loginFailureHandler,
-      SessionRegistry sessionRegistry
+      SessionRegistry sessionRegistry,
+      UserDetailsService userDetailsService
   ) throws Exception {
     http
         // CSR 방식에서 JavaScript가 CSRF 토큰 쿠키를 읽을 수 있도록 HttpOnly를 해제
@@ -61,8 +66,8 @@ public class SecurityConfig {
             .sessionConcurrency(concurrency -> concurrency
                 // 동일 계정으로 유지할 수 있는 로그인 세션을 1개로 제한
                 .maximumSessions(1)
-                // 이미 로그인한 계정의 추가 로그인은 거부
-                .maxSessionsPreventsLogin(true)
+                // Remember-me 재인증처럼 새 인증이 들어오면 기존 세션을 만료하고 새 세션을 허용
+                .maxSessionsPreventsLogin(false)
                 // 동시 로그인 제한과 강제 세션 만료 처리에서 같은 세션 저장소를 사용
                 .sessionRegistry(sessionRegistry)))
         // 로그인 필터는 Spring Security 기본 흐름을 사용하고 성공/실패 응답만 커스터마이징
@@ -73,7 +78,13 @@ public class SecurityConfig {
         .logout(logout -> logout
             .logoutUrl("/api/auth/logout")
             .logoutSuccessHandler(
-                new HttpStatusReturningLogoutSuccessHandler(HttpStatus.NO_CONTENT)));
+                new HttpStatusReturningLogoutSuccessHandler(HttpStatus.NO_CONTENT)))
+        .rememberMe(rememberMe -> rememberMe
+            // 프론트 로그인 유지 체크박스가 전달하는 요청 파라미터 이름
+            .rememberMeParameter("remember-me")
+            .key(REMEMBER_ME_KEY)
+            .tokenValiditySeconds(REMEMBER_ME_VALIDITY_SECONDS)
+            .userDetailsService(userDetailsService));
 
     return http.build();
   }
