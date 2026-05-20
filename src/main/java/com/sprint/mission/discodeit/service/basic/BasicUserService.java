@@ -102,6 +102,8 @@ public class BasicUserService implements UserService {
 
   @Transactional
   @Override
+  // 첫 번째 파라미터(userId)가 현재 인증 사용자 ID와 같을 때만 허용
+  @PreAuthorize("#p0 == authentication.principal.getUserDto().id()")
   public UserDto update(UUID userId, UserUpdateRequest userUpdateRequest,
       Optional<BinaryContentCreateRequest> optionalProfileCreateRequest) {
     log.debug("사용자 수정 시작: id={}, request={}", userId, userUpdateRequest);
@@ -148,6 +150,8 @@ public class BasicUserService implements UserService {
 
   @Transactional
   @Override
+  // 첫 번째 파라미터(userId)가 현재 인증 사용자 ID와 같을 때만 허용
+  @PreAuthorize("#p0 == authentication.principal.getUserDto().id()")
   public void delete(UUID userId) {
     log.debug("사용자 삭제 시작: id={}", userId);
 

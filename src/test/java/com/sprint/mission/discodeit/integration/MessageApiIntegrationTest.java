@@ -12,6 +12,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.sprint.mission.discodeit.config.security.DiscodeitUserDetails;
 import com.sprint.mission.discodeit.dto.data.ChannelDto;
 import com.sprint.mission.discodeit.dto.data.MessageDto;
 import com.sprint.mission.discodeit.dto.data.UserDto;
@@ -19,6 +20,7 @@ import com.sprint.mission.discodeit.dto.request.MessageCreateRequest;
 import com.sprint.mission.discodeit.dto.request.MessageUpdateRequest;
 import com.sprint.mission.discodeit.dto.request.PublicChannelCreateRequest;
 import com.sprint.mission.discodeit.dto.request.UserCreateRequest;
+import com.sprint.mission.discodeit.entity.Role;
 import com.sprint.mission.discodeit.service.ChannelService;
 import com.sprint.mission.discodeit.service.MessageService;
 import com.sprint.mission.discodeit.service.UserService;
@@ -65,12 +67,7 @@ class MessageApiIntegrationTest {
 
   @BeforeEach
   void setUpSecurityContext() {
-    UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(
-        "channelManager",
-        null,
-        List.of(new SimpleGrantedAuthority("ROLE_CHANNEL_MANAGER"))
-    );
-    SecurityContextHolder.getContext().setAuthentication(authentication);
+    authenticateAs(UUID.randomUUID(), "channelManager", Role.CHANNEL_MANAGER);
   }
 
   @AfterEach
@@ -238,6 +235,7 @@ class MessageApiIntegrationTest {
 
     MessageDto createdMessage = messageService.create(createRequest, new ArrayList<>());
     UUID messageId = createdMessage.id();
+    authenticateAs(user);
 
     // 메시지 업데이트 요청
     MessageUpdateRequest updateRequest = new MessageUpdateRequest(
@@ -261,6 +259,7 @@ class MessageApiIntegrationTest {
   void updateMessage_Failure_MessageNotFound() throws Exception {
     // Given
     UUID nonExistentMessageId = UUID.randomUUID();
+    authenticateAs(UUID.randomUUID(), "messageUser", Role.USER);
 
     MessageUpdateRequest updateRequest = new MessageUpdateRequest(
         "수정된 메시지 내용입니다."
@@ -273,6 +272,35 @@ class MessageApiIntegrationTest {
             .contentType(MediaType.APPLICATION_JSON)
             .content(requestBody))
         .andExpect(status().isNotFound());
+  }
+
+  @Test
+  @DisplayName("메시지 업데이트 실패 API 통합 테스트 - 작성자가 아닌 사용자")
+  void updateMessage_Failure_NotAuthor() throws Exception {
+    PublicChannelCreateRequest channelRequest = new PublicChannelCreateRequest(
+        "수정 권한 테스트 채널",
+        "수정 권한 테스트 채널 설명입니다."
+    );
+    ChannelDto channel = channelService.create(channelRequest);
+
+    UserDto author = userService.create(
+        new UserCreateRequest("messageauthor", "message-author@example.com", "Password1!"),
+        Optional.empty());
+    UserDto otherUser = userService.create(
+        new UserCreateRequest("messageother", "message-other@example.com", "Password1!"),
+        Optional.empty());
+
+    MessageDto message = messageService.create(
+        new MessageCreateRequest("작성자만 수정할 수 있는 메시지입니다.", channel.id(), author.id()),
+        new ArrayList<>());
+    authenticateAs(otherUser);
+
+    MessageUpdateRequest updateRequest = new MessageUpdateRequest("다른 사용자의 수정 시도입니다.");
+
+    mockMvc.perform(patch("/api/messages/{messageId}", message.id())
+            .contentType(MediaType.APPLICATION_JSON)
+            .content(objectMapper.writeValueAsString(updateRequest)))
+        .andExpect(status().isForbidden());
   }
 
   @Test
@@ -305,6 +333,7 @@ class MessageApiIntegrationTest {
 
     MessageDto createdMessage = messageService.create(createRequest, new ArrayList<>());
     UUID messageId = createdMessage.id();
+    authenticateAs(user);
 
     // When & Then
     mockMvc.perform(delete("/api/messages/{messageId}", messageId))
@@ -323,9 +352,50 @@ class MessageApiIntegrationTest {
   void deleteMessage_Failure_MessageNotFound() throws Exception {
     // Given
     UUID nonExistentMessageId = UUID.randomUUID();
+    authenticateAs(UUID.randomUUID(), "messageUser", Role.USER);
 
     // When & Then
     mockMvc.perform(delete("/api/messages/{messageId}", nonExistentMessageId))
         .andExpect(status().isNotFound());
+  }
+
+  @Test
+  @DisplayName("메시지 삭제 실패 API 통합 테스트 - 작성자가 아닌 사용자")
+  void deleteMessage_Failure_NotAuthor() throws Exception {
+    PublicChannelCreateRequest channelRequest = new PublicChannelCreateRequest(
+        "삭제 권한 테스트 채널",
+        "삭제 권한 테스트 채널 설명입니다."
+    );
+    ChannelDto channel = channelService.create(channelRequest);
+
+    UserDto author = userService.create(
+        new UserCreateRequest("deleteauthor", "delete-author@example.com", "Password1!"),
+        Optional.empty());
+    UserDto otherUser = userService.create(
+        new UserCreateRequest("deleteother", "delete-other@example.com", "Password1!"),
+        Optional.empty());
+
+    MessageDto message = messageService.create(
+        new MessageCreateRequest("작성자만 삭제할 수 있는 메시지입니다.", channel.id(), author.id()),
+        new ArrayList<>());
+    authenticateAs(otherUser);
+
+    mockMvc.perform(delete("/api/messages/{messageId}", message.id()))
+        .andExpect(status().isForbidden());
+  }
+
+  private void authenticateAs(UserDto userDto) {
+    authenticateAs(userDto.id(), userDto.username(), userDto.role());
+  }
+
+  private void authenticateAs(UUID userId, String username, Role role) {
+    UserDto userDto = new UserDto(userId, username, username + "@example.com", null, true, role);
+    DiscodeitUserDetails userDetails = new DiscodeitUserDetails(userDto, "password");
+    UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(
+        userDetails,
+        null,
+        List.of(new SimpleGrantedAuthority("ROLE_" + role.name()))
+    );
+    SecurityContextHolder.getContext().setAuthentication(authentication);
   }
 } 
