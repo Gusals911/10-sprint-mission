@@ -24,18 +24,23 @@ import com.sprint.mission.discodeit.service.UserService;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
 
 @SpringBootTest
-@AutoConfigureMockMvc
+@AutoConfigureMockMvc(addFilters = false)
 @ActiveProfiles("test")
 @Transactional
 class BinaryContentApiIntegrationTest {
@@ -57,6 +62,21 @@ class BinaryContentApiIntegrationTest {
 
   @Autowired
   private MessageService messageService;
+
+  @BeforeEach
+  void setUpSecurityContext() {
+    UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(
+        "channelManager",
+        null,
+        List.of(new SimpleGrantedAuthority("ROLE_CHANNEL_MANAGER"))
+    );
+    SecurityContextHolder.getContext().setAuthentication(authentication);
+  }
+
+  @AfterEach
+  void clearSecurityContext() {
+    SecurityContextHolder.clearContext();
+  }
 
   @Test
   @DisplayName("바이너리 컨텐츠 조회 API 통합 테스트")

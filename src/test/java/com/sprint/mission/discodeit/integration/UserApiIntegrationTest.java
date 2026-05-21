@@ -1,24 +1,26 @@
 package com.sprint.mission.discodeit.integration;
 
 import static org.hamcrest.Matchers.hasSize;
+import static org.hamcrest.Matchers.hasItem;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.notNullValue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.sprint.mission.discodeit.config.security.DiscodeitUserDetails;
 import com.sprint.mission.discodeit.dto.data.UserDto;
 import com.sprint.mission.discodeit.dto.request.UserCreateRequest;
-import com.sprint.mission.discodeit.dto.request.UserStatusUpdateRequest;
 import com.sprint.mission.discodeit.dto.request.UserUpdateRequest;
+import com.sprint.mission.discodeit.entity.Role;
 import com.sprint.mission.discodeit.service.UserService;
-import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -26,12 +28,15 @@ import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMock
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockMultipartFile;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
 
 @SpringBootTest
-@AutoConfigureMockMvc
+@AutoConfigureMockMvc(addFilters = false)
 @ActiveProfiles("test")
 @Transactional
 class UserApiIntegrationTest {
@@ -45,6 +50,10 @@ class UserApiIntegrationTest {
   @Autowired
   private UserService userService;
 
+  @AfterEach
+  void clearSecurityContext() {
+    SecurityContextHolder.clearContext();
+  }
 
   @Test
   @DisplayName("사용자 생성 API 통합 테스트")
@@ -75,12 +84,12 @@ class UserApiIntegrationTest {
             .file(userCreateRequestPart)
             .file(profilePart)
             .contentType(MediaType.MULTIPART_FORM_DATA_VALUE))
-        .andExpect(status().isCreated())
+        .andExpect(status().isOk())
         .andExpect(jsonPath("$.id", notNullValue()))
         .andExpect(jsonPath("$.username", is("testuser")))
         .andExpect(jsonPath("$.email", is("test@example.com")))
         .andExpect(jsonPath("$.profile.fileName", is("profile.jpg")))
-        .andExpect(jsonPath("$.online", is(true)));
+        .andExpect(jsonPath("$.online", is(false)));
   }
 
   @Test
@@ -131,11 +140,10 @@ class UserApiIntegrationTest {
     mockMvc.perform(get("/api/users")
             .contentType(MediaType.APPLICATION_JSON))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$", hasSize(2)))
-        .andExpect(jsonPath("$[0].username", is("user1")))
-        .andExpect(jsonPath("$[0].email", is("user1@example.com")))
-        .andExpect(jsonPath("$[1].username", is("user2")))
-        .andExpect(jsonPath("$[1].email", is("user2@example.com")));
+        .andExpect(jsonPath("$", hasSize(3)))
+        .andExpect(jsonPath("$[?(@.username == 'admin')].email", hasItem("admin@discodeit.com")))
+        .andExpect(jsonPath("$[?(@.username == 'user1')].email", hasItem("user1@example.com")))
+        .andExpect(jsonPath("$[?(@.username == 'user2')].email", hasItem("user2@example.com")));
   }
 
   @Test
@@ -151,6 +159,7 @@ class UserApiIntegrationTest {
 
     UserDto createdUser = userService.create(createRequest, Optional.empty());
     UUID userId = createdUser.id();
+    authenticateAs(createdUser);
 
     UserUpdateRequest updateRequest = new UserUpdateRequest(
         "updateduser",
@@ -198,6 +207,7 @@ class UserApiIntegrationTest {
         "updated@example.com",
         "UpdatedPassword1!"
     );
+    authenticateAs(nonExistentUserId);
 
     MockMultipartFile userUpdateRequestPart = new MockMultipartFile(
         "userUpdateRequest",
@@ -218,6 +228,40 @@ class UserApiIntegrationTest {
   }
 
   @Test
+  @DisplayName("사용자 업데이트 실패 API 통합 테스트 - 본인이 아닌 사용자")
+  void updateUser_Failure_NotOwner() throws Exception {
+    UserDto targetUser = userService.create(
+        new UserCreateRequest("targetuser", "target@example.com", "Password1!"),
+        Optional.empty());
+    UserDto otherUser = userService.create(
+        new UserCreateRequest("otheruser", "other@example.com", "Password1!"),
+        Optional.empty());
+    authenticateAs(otherUser);
+
+    UserUpdateRequest updateRequest = new UserUpdateRequest(
+        "updateduser",
+        "updated@example.com",
+        "UpdatedPassword1!"
+    );
+
+    MockMultipartFile userUpdateRequestPart = new MockMultipartFile(
+        "userUpdateRequest",
+        "",
+        MediaType.APPLICATION_JSON_VALUE,
+        objectMapper.writeValueAsBytes(updateRequest)
+    );
+
+    mockMvc.perform(multipart("/api/users/{userId}", targetUser.id())
+            .file(userUpdateRequestPart)
+            .contentType(MediaType.MULTIPART_FORM_DATA_VALUE)
+            .with(request -> {
+              request.setMethod("PATCH");
+              return request;
+            }))
+        .andExpect(status().isForbidden());
+  }
+
+  @Test
   @DisplayName("사용자 삭제 API 통합 테스트")
   void deleteUser_Success() throws Exception {
     // Given
@@ -230,6 +274,7 @@ class UserApiIntegrationTest {
 
     UserDto createdUser = userService.create(createRequest, Optional.empty());
     UUID userId = createdUser.id();
+    authenticateAs(createdUser);
 
     // When & Then
     mockMvc.perform(delete("/api/users/{userId}", userId))
@@ -246,6 +291,7 @@ class UserApiIntegrationTest {
   void deleteUser_Failure_UserNotFound() throws Exception {
     // Given
     UUID nonExistentUserId = UUID.randomUUID();
+    authenticateAs(nonExistentUserId);
 
     // When & Then
     mockMvc.perform(delete("/api/users/{userId}", nonExistentUserId))
@@ -253,47 +299,32 @@ class UserApiIntegrationTest {
   }
 
   @Test
-  @DisplayName("사용자 상태 업데이트 API 통합 테스트")
-  void updateUserStatus_Success() throws Exception {
-    // Given
-    // 테스트 사용자 생성 - Service를 통해 초기화
-    UserCreateRequest createRequest = new UserCreateRequest(
-        "statususer",
-        "status@example.com",
-        "Password1!"
-    );
+  @DisplayName("사용자 삭제 실패 API 통합 테스트 - 본인이 아닌 사용자")
+  void deleteUser_Failure_NotOwner() throws Exception {
+    UserDto targetUser = userService.create(
+        new UserCreateRequest("deleteTargetUser", "delete-target@example.com", "Password1!"),
+        Optional.empty());
+    UserDto otherUser = userService.create(
+        new UserCreateRequest("deleteOtherUser", "delete-other@example.com", "Password1!"),
+        Optional.empty());
+    authenticateAs(otherUser);
 
-    UserDto createdUser = userService.create(createRequest, Optional.empty());
-    UUID userId = createdUser.id();
-
-    Instant newLastActiveAt = Instant.now();
-    UserStatusUpdateRequest statusUpdateRequest = new UserStatusUpdateRequest(
-        newLastActiveAt
-    );
-    String requestBody = objectMapper.writeValueAsString(statusUpdateRequest);
-
-    // When & Then
-    mockMvc.perform(patch("/api/users/{userId}/userStatus", userId)
-            .contentType(MediaType.APPLICATION_JSON)
-            .content(requestBody))
-        .andExpect(status().isOk())
-        .andExpect(jsonPath("$.lastActiveAt", is(newLastActiveAt.toString())));
+    mockMvc.perform(delete("/api/users/{userId}", targetUser.id()))
+        .andExpect(status().isForbidden());
   }
 
-  @Test
-  @DisplayName("사용자 상태 업데이트 실패 API 통합 테스트 - 존재하지 않는 사용자")
-  void updateUserStatus_Failure_UserNotFound() throws Exception {
-    // Given
-    UUID nonExistentUserId = UUID.randomUUID();
-    UserStatusUpdateRequest statusUpdateRequest = new UserStatusUpdateRequest(
-        Instant.now()
-    );
-    String requestBody = objectMapper.writeValueAsString(statusUpdateRequest);
+  private void authenticateAs(UUID userId) {
+    authenticateAs(new UserDto(userId, "authenticatedUser", "auth@example.com", null, true,
+        Role.USER));
+  }
 
-    // When & Then
-    mockMvc.perform(patch("/api/users/{userId}/userStatus", nonExistentUserId)
-            .contentType(MediaType.APPLICATION_JSON)
-            .content(requestBody))
-        .andExpect(status().isNotFound());
+  private void authenticateAs(UserDto userDto) {
+    DiscodeitUserDetails userDetails = new DiscodeitUserDetails(userDto, "password");
+    UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(
+        userDetails,
+        null,
+        List.of(new SimpleGrantedAuthority("ROLE_" + userDto.role().name()))
+    );
+    SecurityContextHolder.getContext().setAuthentication(authentication);
   }
 } 

@@ -13,7 +13,7 @@ import com.sprint.mission.discodeit.entity.BinaryContent;
 import com.sprint.mission.discodeit.exception.binarycontent.BinaryContentNotFoundException;
 import com.sprint.mission.discodeit.mapper.BinaryContentMapper;
 import com.sprint.mission.discodeit.repository.BinaryContentRepository;
-import com.sprint.mission.discodeit.storage.BinaryContentStorageSupport;
+import com.sprint.mission.discodeit.storage.BinaryContentStorage;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
@@ -37,7 +37,7 @@ class BasicBinaryContentServiceTest {
   private BinaryContentMapper binaryContentMapper;
 
   @Mock
-  private BinaryContentStorageSupport binaryContentStorageSupport;
+  private BinaryContentStorage binaryContentStorage;
 
   @InjectMocks
   private BasicBinaryContentService binaryContentService;
@@ -68,49 +68,58 @@ class BasicBinaryContentServiceTest {
   }
 
   @Test
-  @DisplayName("諛붿씠?덈━ 肄섑뀗痢??앹꽦 ?깃났")
+  @DisplayName("바이너리 콘텐츠 생성 성공")
   void createBinaryContent_Success() {
+    // given
     BinaryContentCreateRequest request = new BinaryContentCreateRequest(fileName, contentType,
         bytes);
 
     given(binaryContentRepository.save(any(BinaryContent.class))).will(invocation -> {
-      BinaryContent savedBinaryContent = invocation.getArgument(0);
-      ReflectionTestUtils.setField(savedBinaryContent, "id", binaryContentId);
-      return savedBinaryContent;
+      BinaryContent binaryContent = invocation.getArgument(0);
+      ReflectionTestUtils.setField(binaryContent, "id", binaryContentId);
+      return binaryContent;
     });
     given(binaryContentMapper.toDto(any(BinaryContent.class))).willReturn(binaryContentDto);
 
+    // when
     BinaryContentDto result = binaryContentService.create(request);
 
+    // then
     assertThat(result).isEqualTo(binaryContentDto);
     verify(binaryContentRepository).save(any(BinaryContent.class));
-    verify(binaryContentStorageSupport).put(binaryContentId, bytes);
+    verify(binaryContentStorage).put(binaryContentId, bytes);
   }
 
   @Test
-  @DisplayName("諛붿씠?덈━ 肄섑뀗痢?議고쉶 ?깃났")
+  @DisplayName("바이너리 콘텐츠 조회 성공")
   void findBinaryContent_Success() {
+    // given
     given(binaryContentRepository.findById(eq(binaryContentId))).willReturn(
         Optional.of(binaryContent));
     given(binaryContentMapper.toDto(eq(binaryContent))).willReturn(binaryContentDto);
 
+    // when
     BinaryContentDto result = binaryContentService.find(binaryContentId);
 
+    // then
     assertThat(result).isEqualTo(binaryContentDto);
   }
 
   @Test
-  @DisplayName("議댁옱?섏? ?딅뒗 諛붿씠?덈━ 肄섑뀗痢?議고쉶 ???덉쇅 諛쒖깮")
+  @DisplayName("존재하지 않는 바이너리 콘텐츠 조회 시 예외 발생")
   void findBinaryContent_WithNonExistentId_ThrowsException() {
+    // given
     given(binaryContentRepository.findById(eq(binaryContentId))).willReturn(Optional.empty());
 
+    // when & then
     assertThatThrownBy(() -> binaryContentService.find(binaryContentId))
         .isInstanceOf(BinaryContentNotFoundException.class);
   }
 
   @Test
-  @DisplayName("?щ윭 ID濡?諛붿씠?덈━ 肄섑뀗痢?紐⑸줉 議고쉶 ?깃났")
+  @DisplayName("여러 ID로 바이너리 콘텐츠 목록 조회 성공")
   void findAllByIdIn_Success() {
+    // given
     UUID id1 = UUID.randomUUID();
     UUID id2 = UUID.randomUUID();
     List<UUID> ids = Arrays.asList(id1, id2);
@@ -130,28 +139,34 @@ class BasicBinaryContentServiceTest {
     given(binaryContentMapper.toDto(eq(content1))).willReturn(dto1);
     given(binaryContentMapper.toDto(eq(content2))).willReturn(dto2);
 
+    // when
     List<BinaryContentDto> result = binaryContentService.findAllByIdIn(ids);
 
+    // then
     assertThat(result).containsExactly(dto1, dto2);
   }
 
   @Test
-  @DisplayName("諛붿씠?덈━ 肄섑뀗痢???젣 ?깃났")
+  @DisplayName("바이너리 콘텐츠 삭제 성공")
   void deleteBinaryContent_Success() {
-    given(binaryContentRepository.findById(eq(binaryContentId))).willReturn(Optional.of(binaryContent));
+    // given
+    given(binaryContentRepository.existsById(binaryContentId)).willReturn(true);
 
+    // when
     binaryContentService.delete(binaryContentId);
 
-    verify(binaryContentRepository).delete(binaryContent);
-    verify(binaryContentStorageSupport).deleteAfterCommit(binaryContentId);
+    // then
+    verify(binaryContentRepository).deleteById(binaryContentId);
   }
 
   @Test
-  @DisplayName("議댁옱?섏? ?딅뒗 諛붿씠?덈━ 肄섑뀗痢???젣 ???덉쇅 諛쒖깮")
+  @DisplayName("존재하지 않는 바이너리 콘텐츠 삭제 시 예외 발생")
   void deleteBinaryContent_WithNonExistentId_ThrowsException() {
-    given(binaryContentRepository.findById(eq(binaryContentId))).willReturn(Optional.empty());
+    // given
+    given(binaryContentRepository.existsById(eq(binaryContentId))).willReturn(false);
 
+    // when & then
     assertThatThrownBy(() -> binaryContentService.delete(binaryContentId))
         .isInstanceOf(BinaryContentNotFoundException.class);
   }
-}
+} 

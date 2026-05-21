@@ -14,6 +14,8 @@ spring:
   profiles:
     active:
       - dev
+  config:
+    import: optional:file:.env[.properties]
 
 management:
   endpoints:
@@ -59,3 +61,4 @@ discodeit:
 logging:
   level:
     root: info
+    org.springframework.security: trace
