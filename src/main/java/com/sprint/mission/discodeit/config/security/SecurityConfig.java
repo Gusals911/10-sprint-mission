@@ -11,6 +11,7 @@ import org.springframework.security.access.hierarchicalroles.RoleHierarchy;
 import org.springframework.security.access.hierarchicalroles.RoleHierarchyImpl;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.core.session.SessionRegistry;
 import org.springframework.security.core.session.SessionRegistryImpl;
 import org.springframework.security.core.userdetails.UserDetailsService;
@@ -31,7 +32,7 @@ public class SecurityConfig {
   @Bean
   public SecurityFilterChain filterChain(
       HttpSecurity http,
-      LoginSuccessHandler loginSuccessHandler,
+      JwtLoginSuccessHandler jwtLoginSuccessHandler,
       LoginFailureHandler loginFailureHandler,
       SessionRegistry sessionRegistry,
       UserDetailsService userDetailsService
@@ -63,17 +64,11 @@ public class SecurityConfig {
             .accessDeniedHandler((request, response, accessDeniedException) ->
                 response.sendError(HttpServletResponse.SC_FORBIDDEN)))
         .sessionManagement(management -> management
-            .sessionConcurrency(concurrency -> concurrency
-                // 동일 계정으로 유지할 수 있는 로그인 세션을 1개로 제한
-                .maximumSessions(1)
-                // Remember-me 재인증처럼 새 인증이 들어오면 기존 세션을 만료하고 새 세션을 허용
-                .maxSessionsPreventsLogin(false)
-                // 동시 로그인 제한과 강제 세션 만료 처리에서 같은 세션 저장소를 사용
-                .sessionRegistry(sessionRegistry)))
+                .sessionCreationPolicy(SessionCreationPolicy.STATELESS))
         // 로그인 필터는 Spring Security 기본 흐름을 사용하고 성공/실패 응답만 커스터마이징
         .formLogin(login -> login
             .loginProcessingUrl("/api/auth/login")
-            .successHandler(loginSuccessHandler)
+            .successHandler(jwtLoginSuccessHandler)
             .failureHandler(loginFailureHandler))
         .logout(logout -> logout
             .logoutUrl("/api/auth/logout")
