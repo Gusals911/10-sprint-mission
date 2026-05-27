@@ -31,6 +31,7 @@ public class SecurityConfig {
       HttpSecurity http,
       JwtLoginSuccessHandler jwtLoginSuccessHandler,
       LoginFailureHandler loginFailureHandler,
+      JwtLogoutHandler jwtLogoutHandler,
       JwtTokenProvider jwtTokenProvider,
       UserDetailsService userDetailsService
   ) throws Exception {
@@ -52,27 +53,27 @@ public class SecurityConfig {
             .requestMatchers("/actuator/**").permitAll()
             // 권한 수정 요청은 ADMIN 권한 필요
             .requestMatchers(HttpMethod.PUT, "/api/auth/role").hasRole("ADMIN")
-            // 그 외 모든 요청은 인증(로그인) 필요
+            // 그 외 모든 요청은 인증 필요
             .anyRequest().authenticated())
         .exceptionHandling(exception -> exception
             // 인증되지 않은 사용자는 401 응답
             .authenticationEntryPoint((request, response, authException) ->
                 response.sendError(HttpServletResponse.SC_UNAUTHORIZED))
-            // 인증은 되었지만 권한이 부족한 사용자는 403 응답
+            // 인증되었지만 권한이 부족한 사용자는 403 응답
             .accessDeniedHandler((request, response, accessDeniedException) ->
                 response.sendError(HttpServletResponse.SC_FORBIDDEN)))
         .sessionManagement(management -> management
-                .sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-        // 로그인 필터는 Spring Security 기본 흐름을 사용하고 성공/실패 응답만 커스터마이징
+            .sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+        // 로그인 인증 흐름은 formLogin을 사용하고 성공/실패 응답만 커스터마이징
         .formLogin(login -> login
             .loginProcessingUrl("/api/auth/login")
             .successHandler(jwtLoginSuccessHandler)
             .failureHandler(loginFailureHandler))
         .logout(logout -> logout
             .logoutUrl("/api/auth/logout")
+            .addLogoutHandler(jwtLogoutHandler)
             .logoutSuccessHandler(
                 new HttpStatusReturningLogoutSuccessHandler(HttpStatus.NO_CONTENT)))
-            // 프론트 로그인 유지 체크박스가 전달하는 요청 파라미터 이름
         .addFilterBefore(
             new JwtAuthenticationFilter(jwtTokenProvider, userDetailsService),
             UsernamePasswordAuthenticationFilter.class);
@@ -103,7 +104,7 @@ public class SecurityConfig {
       RoleHierarchy roleHierarchy
   ) {
     DefaultMethodSecurityExpressionHandler handler = new DefaultMethodSecurityExpressionHandler();
-    // 메서드 권한 검사에서도 권한 계층을 반영
+    // 메서드 권한 검사에도 권한 계층을 반영
     handler.setRoleHierarchy(roleHierarchy);
     return handler;
   }

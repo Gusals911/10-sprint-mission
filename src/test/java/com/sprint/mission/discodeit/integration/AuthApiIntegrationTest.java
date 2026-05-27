@@ -136,12 +136,30 @@ class AuthApiIntegrationTest {
   @Test
   @DisplayName("로그아웃 API 통합 테스트 - 성공")
   void logout_Success() throws Exception {
+    UserCreateRequest userRequest = new UserCreateRequest(
+        "logoutuser",
+        "logout@example.com",
+        "Password1!"
+    );
+    userService.create(userRequest, Optional.empty());
+
+    MvcResult loginResult = performLogin("logoutuser", "Password1!")
+        .andExpect(status().isOk())
+        .andReturn();
+    Cookie refreshTokenCookie = loginResult.getResponse().getCookie("REFRESH_TOKEN");
+    assertThat(refreshTokenCookie).isNotNull();
     Cookie csrfCookie = getCsrfCookie();
 
-    mockMvc.perform(post("/api/auth/logout")
-            .cookie(csrfCookie)
+    MvcResult logoutResult = mockMvc.perform(post("/api/auth/logout")
+            .cookie(csrfCookie, refreshTokenCookie)
             .header("X-XSRF-TOKEN", csrfCookie.getValue()))
-        .andExpect(status().isNoContent());
+        .andExpect(status().isNoContent())
+        .andReturn();
+
+    assertThat(logoutResult.getResponse().getHeaders(HttpHeaders.SET_COOKIE))
+        .anySatisfy(cookie -> assertThat(cookie)
+            .contains("REFRESH_TOKEN=")
+            .contains("Max-Age=0"));
   }
 
   private ResultActions performLogin(String username, String password) throws Exception {
