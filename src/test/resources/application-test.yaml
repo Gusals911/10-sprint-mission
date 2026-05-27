@@ -1,9 +1,6 @@
 spring:
-  sql:
-    init:
-      mode: never
   datasource:
-    url: jdbc:h2:mem:testdb;MODE=PostgreSQL
+    url: jdbc:h2:mem:testdb-${random.uuid};MODE=PostgreSQL
     driver-class-name: org.h2.Driver
     username: sa
     password:

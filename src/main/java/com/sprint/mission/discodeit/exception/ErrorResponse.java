@@ -18,10 +18,10 @@ public class ErrorResponse {
     private final int status;
 
     public ErrorResponse(DiscodeitException exception, int status) {
-        this(Instant.now(), exception.getErrorCode().getCode(), exception.getMessage(), exception.getDetails(), exception.getClass().getSimpleName(), status);
+        this(Instant.now(), exception.getErrorCode().name(), exception.getMessage(), exception.getDetails(), exception.getClass().getSimpleName(), status);
     }
 
     public ErrorResponse(Exception exception, int status) {
         this(Instant.now(), exception.getClass().getSimpleName(), exception.getMessage(), new HashMap<>(), exception.getClass().getSimpleName(), status);
     }
-}
+} 

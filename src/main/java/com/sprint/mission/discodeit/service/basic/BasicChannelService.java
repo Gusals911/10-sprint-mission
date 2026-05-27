@@ -4,30 +4,24 @@ import com.sprint.mission.discodeit.dto.data.ChannelDto;
 import com.sprint.mission.discodeit.dto.request.PrivateChannelCreateRequest;
 import com.sprint.mission.discodeit.dto.request.PublicChannelCreateRequest;
 import com.sprint.mission.discodeit.dto.request.PublicChannelUpdateRequest;
-import com.sprint.mission.discodeit.entity.BinaryContent;
 import com.sprint.mission.discodeit.entity.Channel;
 import com.sprint.mission.discodeit.entity.ChannelType;
-import com.sprint.mission.discodeit.entity.Message;
 import com.sprint.mission.discodeit.entity.ReadStatus;
-import com.sprint.mission.discodeit.entity.User;
 import com.sprint.mission.discodeit.exception.channel.ChannelNotFoundException;
-import com.sprint.mission.discodeit.exception.channel.InvalidChannelParticipantsException;
 import com.sprint.mission.discodeit.exception.channel.PrivateChannelUpdateException;
-import com.sprint.mission.discodeit.exception.user.UserNotFoundException;
 import com.sprint.mission.discodeit.mapper.ChannelMapper;
 import com.sprint.mission.discodeit.repository.ChannelRepository;
 import com.sprint.mission.discodeit.repository.MessageRepository;
 import com.sprint.mission.discodeit.repository.ReadStatusRepository;
 import com.sprint.mission.discodeit.repository.UserRepository;
 import com.sprint.mission.discodeit.service.ChannelService;
-import com.sprint.mission.discodeit.storage.BinaryContentStorageSupport;
-import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
 @Service
@@ -35,14 +29,15 @@ import org.springframework.transaction.annotation.Transactional;
 public class BasicChannelService implements ChannelService {
 
   private final ChannelRepository channelRepository;
+  //
   private final ReadStatusRepository readStatusRepository;
   private final MessageRepository messageRepository;
   private final UserRepository userRepository;
   private final ChannelMapper channelMapper;
-  private final BinaryContentStorageSupport binaryContentStorageSupport;
 
   @Transactional
   @Override
+  @PreAuthorize("hasRole('CHANNEL_MANAGER')")
   public ChannelDto create(PublicChannelCreateRequest request) {
     log.debug("채널 생성 시작: {}", request);
     String name = request.name();
@@ -58,29 +53,10 @@ public class BasicChannelService implements ChannelService {
   @Override
   public ChannelDto create(PrivateChannelCreateRequest request) {
     log.debug("채널 생성 시작: {}", request);
-
-    List<UUID> participantIds = request.participantIds().stream()
-        .distinct()
-        .toList();
-    if (participantIds.size() < 2) {
-      throw InvalidChannelParticipantsException.withParticipantIds(request.participantIds());
-    }
-
-    List<User> participants = userRepository.findAllById(participantIds);
-    if (participants.size() != participantIds.size()) {
-      UUID missingParticipantId = participantIds.stream()
-          .filter(participantId -> participants.stream()
-              .noneMatch(user -> user.getId().equals(participantId)))
-          .findFirst()
-          .orElseThrow(() -> InvalidChannelParticipantsException.withParticipantIds(
-              request.participantIds()));
-      throw UserNotFoundException.withId(missingParticipantId);
-    }
-
     Channel channel = new Channel(ChannelType.PRIVATE, null, null);
     channelRepository.save(channel);
 
-    List<ReadStatus> readStatuses = participants.stream()
+    List<ReadStatus> readStatuses = userRepository.findAllById(request.participantIds()).stream()
         .map(user -> new ReadStatus(user, channel, channel.getCreatedAt()))
         .toList();
     readStatusRepository.saveAll(readStatuses);
@@ -113,6 +89,7 @@ public class BasicChannelService implements ChannelService {
 
   @Transactional
   @Override
+  @PreAuthorize("hasRole('CHANNEL_MANAGER')")
   public ChannelDto update(UUID channelId, PublicChannelUpdateRequest request) {
     log.debug("채널 수정 시작: id={}, request={}", channelId, request);
     String newName = request.newName();
@@ -129,31 +106,14 @@ public class BasicChannelService implements ChannelService {
 
   @Transactional
   @Override
+  @PreAuthorize("hasRole('CHANNEL_MANAGER')")
   public void delete(UUID channelId) {
     log.debug("채널 삭제 시작: id={}", channelId);
     if (!channelRepository.existsById(channelId)) {
       throw ChannelNotFoundException.withId(channelId);
     }
 
-    List<Message> messages = messageRepository.findAllByChannelIdWithAttachments(channelId);
-    if (messages == null) {
-      messages = Collections.emptyList();
-    }
-
-    List<UUID> attachmentIds = messages.stream()
-        .map(Message::getAttachments)
-        .flatMap(List::stream)
-        .map(BinaryContent::getId)
-        .toList();
-    if (!attachmentIds.isEmpty()) {
-      attachmentIds.forEach(binaryContentStorageSupport::deleteAfterCommit);
-    }
-
-    if (messages.isEmpty()) {
-      messageRepository.deleteAllByChannelId(channelId);
-    } else {
-      messageRepository.deleteAll(messages);
-    }
+    messageRepository.deleteAllByChannelId(channelId);
     readStatusRepository.deleteAllByChannelId(channelId);
 
     channelRepository.deleteById(channelId);

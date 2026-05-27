@@ -69,18 +69,6 @@ public class LocalBinaryContentStorage implements BinaryContentStorage {
     }
   }
 
-  @Override
-  public void delete(UUID binaryContentId) {
-    Path filePath = resolvePath(binaryContentId);
-    try {
-      if (!Files.deleteIfExists(filePath)) {
-        throw new NoSuchElementException("File with key " + binaryContentId + " does not exist");
-      }
-    } catch (IOException e) {
-      throw new RuntimeException(e);
-    }
-  }
-
   private Path resolvePath(UUID key) {
     return root.resolve(key.toString());
   }

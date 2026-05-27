@@ -28,7 +28,7 @@ import com.sprint.mission.discodeit.repository.BinaryContentRepository;
 import com.sprint.mission.discodeit.repository.ChannelRepository;
 import com.sprint.mission.discodeit.repository.MessageRepository;
 import com.sprint.mission.discodeit.repository.UserRepository;
-import com.sprint.mission.discodeit.storage.BinaryContentStorageSupport;
+import com.sprint.mission.discodeit.storage.BinaryContentStorage;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
@@ -61,7 +61,7 @@ class BasicMessageServiceTest {
   private MessageMapper messageMapper;
 
   @Mock
-  private BinaryContentStorageSupport binaryContentStorageSupport;
+  private BinaryContentStorage binaryContentStorage;
 
   @Mock
   private BinaryContentRepository binaryContentRepository;
@@ -138,7 +138,7 @@ class BasicMessageServiceTest {
     // then
     assertThat(result).isEqualTo(messageDto);
     verify(messageRepository).save(any(Message.class));
-    verify(binaryContentStorageSupport).put(eq(attachment.getId()), any(byte[].class));
+    verify(binaryContentStorage).put(eq(attachment.getId()), any(byte[].class));
   }
 
   @Test
@@ -343,21 +343,20 @@ class BasicMessageServiceTest {
   @DisplayName("메시지 삭제 성공")
   void deleteMessage_Success() {
     // given
-    given(messageRepository.findByIdWithAttachments(eq(messageId))).willReturn(Optional.of(message));
+    given(messageRepository.existsById(eq(messageId))).willReturn(true);
 
     // when
     messageService.delete(messageId);
 
     // then
-    verify(binaryContentStorageSupport).deleteAfterCommit(eq(attachment.getId()));
-    verify(messageRepository).delete(eq(message));
+    verify(messageRepository).deleteById(eq(messageId));
   }
 
   @Test
   @DisplayName("존재하지 않는 메시지 삭제 시도 시 실패")
   void deleteMessage_WithNonExistentId_ThrowsException() {
     // given
-    given(messageRepository.findByIdWithAttachments(eq(messageId))).willReturn(Optional.empty());
+    given(messageRepository.existsById(eq(messageId))).willReturn(false);
 
     // when & then
     assertThatThrownBy(() -> messageService.delete(messageId))
