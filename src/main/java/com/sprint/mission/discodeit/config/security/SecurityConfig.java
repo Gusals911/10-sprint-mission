@@ -21,14 +21,10 @@ import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.security.web.authentication.logout.HttpStatusReturningLogoutSuccessHandler;
 import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
-import org.springframework.security.web.session.HttpSessionEventPublisher;
 
 @Configuration
 @EnableMethodSecurity
 public class SecurityConfig {
-
-  private static final String REMEMBER_ME_KEY = "discodeit-remember-me";
-  private static final int REMEMBER_ME_VALIDITY_SECONDS = 60 * 60 * 24 * 14;
 
   @Bean
   public SecurityFilterChain filterChain(
@@ -48,6 +44,7 @@ public class SecurityConfig {
             .requestMatchers(HttpMethod.GET, "/api/auth/csrf-token").permitAll()
             .requestMatchers(HttpMethod.POST, "/api/auth/login").permitAll()
             .requestMatchers(HttpMethod.POST, "/api/auth/logout").permitAll()
+            .requestMatchers(HttpMethod.POST, "/api/auth/refresh").permitAll()
             .requestMatchers(HttpMethod.POST, "/api/users").permitAll()
             // 프론트 정적 리소스와 API 문서, 모니터링 요청은 인증 없이 허용
             .requestMatchers("/", "/index.html", "/favicon.ico", "/assets/**").permitAll()
@@ -75,12 +72,7 @@ public class SecurityConfig {
             .logoutUrl("/api/auth/logout")
             .logoutSuccessHandler(
                 new HttpStatusReturningLogoutSuccessHandler(HttpStatus.NO_CONTENT)))
-        .rememberMe(rememberMe -> rememberMe
             // 프론트 로그인 유지 체크박스가 전달하는 요청 파라미터 이름
-            .rememberMeParameter("remember-me")
-            .key(REMEMBER_ME_KEY)
-            .tokenValiditySeconds(REMEMBER_ME_VALIDITY_SECONDS)
-            .userDetailsService(userDetailsService))
         .addFilterBefore(
             new JwtAuthenticationFilter(jwtTokenProvider, userDetailsService),
             UsernamePasswordAuthenticationFilter.class);
@@ -95,14 +87,7 @@ public class SecurityConfig {
 
   @Bean
   public SessionRegistry sessionRegistry() {
-    // 현재 로그인한 Principal과 세션 정보를 추적
     return new SessionRegistryImpl();
-  }
-
-  @Bean
-  public HttpSessionEventPublisher httpSessionEventPublisher() {
-    // HttpSession 만료/소멸 이벤트를 SessionRegistry에 반영
-    return new HttpSessionEventPublisher();
   }
 
   @Bean
