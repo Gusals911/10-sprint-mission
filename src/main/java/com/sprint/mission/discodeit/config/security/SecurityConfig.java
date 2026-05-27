@@ -18,6 +18,7 @@ import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.security.web.authentication.logout.HttpStatusReturningLogoutSuccessHandler;
 import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
 import org.springframework.security.web.session.HttpSessionEventPublisher;
@@ -34,7 +35,7 @@ public class SecurityConfig {
       HttpSecurity http,
       JwtLoginSuccessHandler jwtLoginSuccessHandler,
       LoginFailureHandler loginFailureHandler,
-      SessionRegistry sessionRegistry,
+      JwtTokenProvider jwtTokenProvider,
       UserDetailsService userDetailsService
   ) throws Exception {
     http
@@ -79,7 +80,10 @@ public class SecurityConfig {
             .rememberMeParameter("remember-me")
             .key(REMEMBER_ME_KEY)
             .tokenValiditySeconds(REMEMBER_ME_VALIDITY_SECONDS)
-            .userDetailsService(userDetailsService));
+            .userDetailsService(userDetailsService))
+        .addFilterBefore(
+            new JwtAuthenticationFilter(jwtTokenProvider, userDetailsService),
+            UsernamePasswordAuthenticationFilter.class);
 
     return http.build();
   }
