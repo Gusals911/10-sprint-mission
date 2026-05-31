@@ -12,8 +12,6 @@ import org.springframework.security.access.hierarchicalroles.RoleHierarchyImpl;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
-import org.springframework.security.core.session.SessionRegistry;
-import org.springframework.security.core.session.SessionRegistryImpl;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -33,6 +31,7 @@ public class SecurityConfig {
       LoginFailureHandler loginFailureHandler,
       JwtLogoutHandler jwtLogoutHandler,
       JwtTokenProvider jwtTokenProvider,
+      JwtRegistry jwtRegistry,
       UserDetailsService userDetailsService
   ) throws Exception {
     http
@@ -75,7 +74,7 @@ public class SecurityConfig {
             .logoutSuccessHandler(
                 new HttpStatusReturningLogoutSuccessHandler(HttpStatus.NO_CONTENT)))
         .addFilterBefore(
-            new JwtAuthenticationFilter(jwtTokenProvider, userDetailsService),
+            new JwtAuthenticationFilter(jwtTokenProvider, jwtRegistry, userDetailsService),
             UsernamePasswordAuthenticationFilter.class);
 
     return http.build();
@@ -84,11 +83,6 @@ public class SecurityConfig {
   @Bean
   public PasswordEncoder passwordEncoder() {
     return new BCryptPasswordEncoder();
-  }
-
-  @Bean
-  public SessionRegistry sessionRegistry() {
-    return new SessionRegistryImpl();
   }
 
   @Bean

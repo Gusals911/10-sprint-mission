@@ -1,6 +1,8 @@
 package com.sprint.mission.discodeit.controller;
 
 import com.sprint.mission.discodeit.config.security.DiscodeitUserDetails;
+import com.sprint.mission.discodeit.config.security.JwtInformation;
+import com.sprint.mission.discodeit.config.security.JwtRegistry;
 import com.sprint.mission.discodeit.config.security.JwtTokenProvider;
 import com.sprint.mission.discodeit.dto.data.JwtDto;
 import com.sprint.mission.discodeit.dto.data.UserDto;
@@ -33,10 +35,9 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/auth")
 public class AuthController {
 
-  private static final String REFRESH_TOKEN_COOKIE_NAME = "REFRESH_TOKEN";
-
   private final UserService userService;
   private final JwtTokenProvider jwtTokenProvider;
+  private final JwtRegistry jwtRegistry;
   private final UserDetailsService userDetailsService;
 
   @GetMapping(path = "csrf-token")
@@ -51,9 +52,12 @@ public class AuthController {
 
   @PostMapping(path = "refresh")
   public ResponseEntity<?> refresh(
-      @CookieValue(name = REFRESH_TOKEN_COOKIE_NAME, required = false) String refreshToken
+      @CookieValue(name = JwtTokenProvider.REFRESH_TOKEN_COOKIE_NAME, required = false)
+      String refreshToken
   ) {
-    if (refreshToken == null || !jwtTokenProvider.validateRefreshToken(refreshToken)) {
+    if (refreshToken == null
+        || !jwtTokenProvider.validateRefreshToken(refreshToken)
+        || !jwtRegistry.hasActiveJwtInformationByRefreshToken(refreshToken)) {
       return unauthorizedRefreshTokenResponse();
     }
 
@@ -64,6 +68,18 @@ public class AuthController {
 
       String newAccessToken = jwtTokenProvider.generateAccessToken(userDetails);
       String newRefreshToken = jwtTokenProvider.generateRefreshToken(userDetails);
+      JwtInformation jwtInformation = new JwtInformation(
+          userDetails.getUserDto().id(),
+          userDetails.getUsername(),
+          userDetails.getUserDto().role(),
+          newAccessToken,
+          newRefreshToken,
+          jwtTokenProvider.getExpirationTime(newAccessToken).toInstant(),
+          jwtTokenProvider.getExpirationTime(newRefreshToken).toInstant()
+      );
+      if (!jwtRegistry.rotateJwtInformation(refreshToken, jwtInformation)) {
+        return unauthorizedRefreshTokenResponse();
+      }
 
       ResponseCookie refreshTokenCookie = createRefreshTokenCookie(newRefreshToken);
       JwtDto jwtDto = new JwtDto(userDetails.toAuthenticatedUserDto(), newAccessToken);
@@ -103,7 +119,7 @@ public class AuthController {
   }
 
   private ResponseCookie createRefreshTokenCookie(String refreshToken) {
-    return ResponseCookie.from(REFRESH_TOKEN_COOKIE_NAME, refreshToken)
+    return ResponseCookie.from(JwtTokenProvider.REFRESH_TOKEN_COOKIE_NAME, refreshToken)
         .httpOnly(true)
         .secure(false)
         .path("/")

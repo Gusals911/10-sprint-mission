@@ -10,7 +10,6 @@ import com.nimbusds.jwt.JWTClaimsSet;
 import com.nimbusds.jwt.SignedJWT;
 import com.sprint.mission.discodeit.entity.Role;
 import java.nio.charset.StandardCharsets;
-import java.text.ParseException;
 import java.util.Date;
 import java.util.Map;
 import java.util.UUID;
@@ -21,6 +20,7 @@ import org.springframework.stereotype.Component;
 @Component
 public class JwtTokenProvider {
 
+    public static final String REFRESH_TOKEN_COOKIE_NAME = "REFRESH_TOKEN";
     private static final String TOKEN_TYPE_CLAIM = "type";
     private static final String ACCESS_TOKEN_TYPE = "access";
     private static final String REFRESH_TOKEN_TYPE = "refresh";
@@ -101,6 +101,14 @@ public class JwtTokenProvider {
             return Role.valueOf(role);
         } catch (Exception e) {
             throw new RuntimeException("JWT에서 사용자 권한을 읽을 수 없습니다.", e);
+        }
+    }
+
+    public Date getExpirationTime(String token) {
+        try {
+            return getJwtClaimsSet(token).getExpirationTime();
+        } catch (Exception e) {
+            throw new RuntimeException("JWT 만료 시간을 읽을 수 없습니다.", e);
         }
     }
 
