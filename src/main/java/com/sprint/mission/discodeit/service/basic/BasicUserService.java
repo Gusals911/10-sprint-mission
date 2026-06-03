@@ -1,6 +1,6 @@
 package com.sprint.mission.discodeit.service.basic;
 
-import com.sprint.mission.discodeit.config.security.DiscodeitUserDetails;
+import com.sprint.mission.discodeit.config.security.JwtRegistry;
 import com.sprint.mission.discodeit.dto.data.UserDto;
 import com.sprint.mission.discodeit.dto.request.BinaryContentCreateRequest;
 import com.sprint.mission.discodeit.dto.request.UserCreateRequest;
@@ -21,8 +21,6 @@ import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.security.core.session.SessionInformation;
-import org.springframework.security.core.session.SessionRegistry;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -37,13 +35,14 @@ public class BasicUserService implements UserService {
   private final BinaryContentRepository binaryContentRepository;
   private final BinaryContentStorage binaryContentStorage;
   private final PasswordEncoder passwordEncoder;
-  // 권한이 변경된 사용자의 기존 로그인 세션을 만료하기 위해 사용
-  private final SessionRegistry sessionRegistry;
+  private final JwtRegistry jwtRegistry;
 
   @Transactional
   @Override
-  public UserDto create(UserCreateRequest userCreateRequest,
-      Optional<BinaryContentCreateRequest> optionalProfileCreateRequest) {
+  public UserDto create(
+      UserCreateRequest userCreateRequest,
+      Optional<BinaryContentCreateRequest> optionalProfileCreateRequest
+  ) {
     log.debug("사용자 생성 시작: {}", userCreateRequest);
 
     String username = userCreateRequest.username();
@@ -102,17 +101,16 @@ public class BasicUserService implements UserService {
 
   @Transactional
   @Override
-  // 첫 번째 파라미터(userId)가 현재 인증 사용자 ID와 같을 때만 허용
   @PreAuthorize("#p0 == authentication.principal.getUserDto().id()")
-  public UserDto update(UUID userId, UserUpdateRequest userUpdateRequest,
-      Optional<BinaryContentCreateRequest> optionalProfileCreateRequest) {
+  public UserDto update(
+      UUID userId,
+      UserUpdateRequest userUpdateRequest,
+      Optional<BinaryContentCreateRequest> optionalProfileCreateRequest
+  ) {
     log.debug("사용자 수정 시작: id={}, request={}", userId, userUpdateRequest);
 
     User user = userRepository.findById(userId)
-        .orElseThrow(() -> {
-          UserNotFoundException exception = UserNotFoundException.withId(userId);
-          return exception;
-        });
+        .orElseThrow(() -> UserNotFoundException.withId(userId));
 
     String newUsername = userUpdateRequest.newUsername();
     String newEmail = userUpdateRequest.newEmail();
@@ -127,7 +125,6 @@ public class BasicUserService implements UserService {
 
     BinaryContent nullableProfile = optionalProfileCreateRequest
         .map(profileRequest -> {
-
           String fileName = profileRequest.fileName();
           String contentType = profileRequest.contentType();
           byte[] bytes = profileRequest.bytes();
@@ -150,7 +147,6 @@ public class BasicUserService implements UserService {
 
   @Transactional
   @Override
-  // 첫 번째 파라미터(userId)가 현재 인증 사용자 ID와 같을 때만 허용
   @PreAuthorize("#p0 == authentication.principal.getUserDto().id()")
   public void delete(UUID userId) {
     log.debug("사용자 삭제 시작: id={}", userId);
@@ -173,33 +169,10 @@ public class BasicUserService implements UserService {
         .orElseThrow(() -> UserNotFoundException.withId(userId));
     user.updateRole(newRole);
 
-    int expiredSessionCount = expireUserSessions(userId);
+    int invalidatedJwtCount = jwtRegistry.invalidateJwtInformationByUserId(userId);
 
-    log.info("사용자 권한 수정 완료: id={}, role={}, expiredSessions={}", userId, newRole,
-        expiredSessionCount);
+    log.info("사용자 권한 수정 완료: id={}, role={}, invalidatedJwtCount={}", userId, newRole,
+        invalidatedJwtCount);
     return userMapper.toDto(user);
-  }
-
-  private int expireUserSessions(UUID userId) {
-    int expiredSessionCount = 0;
-
-    // SessionRegistry에 등록된 Principal 중 권한 변경 대상 사용자의 세션만 만료 처리
-    for (Object principal : sessionRegistry.getAllPrincipals()) {
-      if (!(principal instanceof DiscodeitUserDetails userDetails)) {
-        continue;
-      }
-
-      if (!userId.equals(userDetails.getUserDto().id())) {
-        continue;
-      }
-
-      List<SessionInformation> sessions = sessionRegistry.getAllSessions(principal, false);
-      for (SessionInformation session : sessions) {
-        session.expireNow();
-        expiredSessionCount++;
-      }
-    }
-
-    return expiredSessionCount;
   }
 }

@@ -62,3 +62,8 @@ logging:
   level:
     root: info
     org.springframework.security: trace
+
+jwt:
+  key: ${JWT_SECRET:local-development-secret-key-must-be-at-least-32-bytes}
+  access-token-expiration-minutes: 15
+  refresh-token-expiration-minutes: 10080

@@ -13,7 +13,8 @@ import org.springframework.security.core.userdetails.UserDetails;
 @Getter
 @RequiredArgsConstructor
 public class DiscodeitUserDetails implements UserDetails {
-  // 인증 Principal에 담아둘 사용자 응답 정보
+
+  // 인증 Principal에 담아 사용할 사용자 응답 정보
   private final UserDto userDto;
   // Spring Security가 PasswordEncoder로 검증할 암호화된 비밀번호
   private final String password;
@@ -35,7 +36,7 @@ public class DiscodeitUserDetails implements UserDetails {
   }
 
   public UserDto toAuthenticatedUserDto() {
-    // 현재 인증된 세션의 사용자 응답에서는 로그인 상태를 true로 반환
+    // 인증된 사용자 응답에서는 로그인 상태를 true로 반환
     return new UserDto(
         userDto.id(),
         userDto.username(),
@@ -56,7 +57,7 @@ public class DiscodeitUserDetails implements UserDetails {
       return false;
     }
 
-    // SessionRegistry가 동일 사용자의 세션을 정확히 찾을 수 있도록 사용자 ID 기준으로 비교
+    // 사용자 ID가 같으면 같은 인증 주체로 판단
     return Objects.equals(userDto.id(), that.userDto.id());
   }
 
