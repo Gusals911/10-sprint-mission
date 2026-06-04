@@ -20,7 +20,8 @@ CREATE TABLE binary_contents
     file_name    varchar(255)             NOT NULL,
     size         bigint                   NOT NULL,
     content_type varchar(100)             NOT NULL
---     ,bytes        bytea        NOT NULL
+    updated_at timestamp with time zone,
+    status varchar(20) NOT NULL
 );
 
 -- Channel
