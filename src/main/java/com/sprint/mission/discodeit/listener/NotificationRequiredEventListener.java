@@ -10,6 +10,7 @@ import com.sprint.mission.discodeit.repository.NotificationRepository;
 import com.sprint.mission.discodeit.repository.ReadStatusRepository;
 import com.sprint.mission.discodeit.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -25,6 +26,7 @@ public class NotificationRequiredEventListener {
     private final ReadStatusRepository readStatusRepository;
     private final UserRepository userRepository;
 
+    @Async("asyncTaskExecutor")
     @TransactionalEventListener
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void on(MessageCreatedEvent event) {
@@ -42,6 +44,7 @@ public class NotificationRequiredEventListener {
         notificationRepository.saveAll(notifications);
     }
 
+    @Async("asyncTaskExecutor")
     @TransactionalEventListener
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void on(RoleUpdatedEvent event) {
