@@ -26,6 +26,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Slice;
@@ -49,6 +50,7 @@ public class BasicMessageService implements MessageService {
 
   @Transactional
   @Override
+  @CacheEvict(cacheNames = "channelsByUser", allEntries = true)
   public MessageDto create(MessageCreateRequest messageCreateRequest,
       List<BinaryContentCreateRequest> binaryContentCreateRequests) {
     log.debug("메시지 생성 시작: request={}", messageCreateRequest);

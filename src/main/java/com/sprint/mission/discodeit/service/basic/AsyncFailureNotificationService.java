@@ -3,6 +3,7 @@ package com.sprint.mission.discodeit.service.basic;
 import com.sprint.mission.discodeit.config.MDCLoggingInterceptor;
 import com.sprint.mission.discodeit.entity.Notification;
 import com.sprint.mission.discodeit.entity.Role;
+import com.sprint.mission.discodeit.entity.User;
 import com.sprint.mission.discodeit.repository.NotificationRepository;
 import com.sprint.mission.discodeit.repository.UserRepository;
 import java.util.List;
@@ -11,6 +12,8 @@ import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.slf4j.MDC;
+import org.springframework.cache.Cache;
+import org.springframework.cache.CacheManager;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -22,7 +25,8 @@ public class AsyncFailureNotificationService {
 
     private final UserRepository userRepository;
     private final NotificationRepository notificationRepository;
-
+    private final CacheManager cacheManager;
+    
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void notifyS3UploadFailed(UUID binaryContentId, Throwable exception) {
         String requestId = Optional.ofNullable(MDC.get(MDCLoggingInterceptor.REQUEST_ID))
@@ -35,7 +39,8 @@ public class AsyncFailureNotificationService {
         Error: %s
         """.formatted(requestId, binaryContentId, exception.getMessage());
 
-        List<Notification> notifications = userRepository.findAllByRole(Role.ADMIN).stream()
+        List<User> admins = userRepository.findAllByRole(Role.ADMIN);
+        List<Notification> notifications = admins.stream()
                 .map(admin -> new Notification(admin, "S3 파일 업로드 실패", content))
                 .toList();
 
@@ -45,5 +50,13 @@ public class AsyncFailureNotificationService {
         }
 
         notificationRepository.saveAll(notifications);
+        admins.forEach(admin -> evictNotificationCache(admin.getId()));
+    }
+
+    private void evictNotificationCache(UUID receiverId) {
+        Cache cache = cacheManager.getCache("notificationsByReceiver");
+        if (cache != null) {
+            cache.evict(receiverId);
+        }
     }
 }
