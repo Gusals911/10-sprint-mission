@@ -23,7 +23,7 @@ public class BasicNotificationService implements NotificationService {
     private final NotificationRepository notificationRepository;
     private final NotificationMapper notificationMapper;
 
-    @Cacheable(cacheNames = "notificationsByReceiver", key = "#receiverId")
+    @Cacheable(cacheNames = "notifications", key = "#receiverId")
     @Transactional(readOnly = true)
     @Override
     public List<NotificationDto> findAllByReceiverId(UUID receiverId) {
@@ -35,7 +35,7 @@ public class BasicNotificationService implements NotificationService {
 
     @Transactional
     @Override
-    @CacheEvict(cacheNames = "notificationsByReceiver", key = "#requesterId")
+    @CacheEvict(cacheNames = "notifications", key = "#requesterId")
     public void delete(UUID notificationId, UUID requesterId) {
         Notification notification = notificationRepository.findById(notificationId)
                 .orElseThrow(() -> NotificationNotFoundException.withId(notificationId));

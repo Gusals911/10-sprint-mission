@@ -68,7 +68,7 @@ public class NotificationRequiredEventListener {
     }
 
     private void evictNotificationCache(UUID receiverId) {
-        Cache cache = cacheManager.getCache("notificationsByReceiver");
+        Cache cache = cacheManager.getCache("notifications");
         if (cache != null) {
             cache.evict(receiverId);
         }

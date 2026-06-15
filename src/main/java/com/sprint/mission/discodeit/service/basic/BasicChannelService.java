@@ -40,7 +40,7 @@ public class BasicChannelService implements ChannelService {
   @Transactional
   @Override
   @PreAuthorize("hasRole('CHANNEL_MANAGER')")
-  @CacheEvict(cacheNames = "channelsByUser", allEntries = true)
+  @CacheEvict(cacheNames = "channels", allEntries = true)
   public ChannelDto create(PublicChannelCreateRequest request) {
     log.debug("채널 생성 시작: {}", request);
     String name = request.name();
@@ -54,7 +54,7 @@ public class BasicChannelService implements ChannelService {
 
   @Transactional
   @Override
-  @CacheEvict(cacheNames = "channelsByUser", allEntries = true)
+  @CacheEvict(cacheNames = "channels", allEntries = true)
   public ChannelDto create(PrivateChannelCreateRequest request) {
     log.debug("채널 생성 시작: {}", request);
     Channel channel = new Channel(ChannelType.PRIVATE, null, null);
@@ -77,7 +77,7 @@ public class BasicChannelService implements ChannelService {
         .orElseThrow(() -> ChannelNotFoundException.withId(channelId));
   }
 
-  @Cacheable(cacheNames = "channelsByUser", key = "#userId")
+  @Cacheable(cacheNames = "channels", key = "#userId")
   @Transactional(readOnly = true)
   @Override
   public List<ChannelDto> findAllByUserId(UUID userId) {
@@ -95,7 +95,7 @@ public class BasicChannelService implements ChannelService {
   @Transactional
   @Override
   @PreAuthorize("hasRole('CHANNEL_MANAGER')")
-  @CacheEvict(cacheNames = "channelsByUser", allEntries = true)
+  @CacheEvict(cacheNames = "channels", allEntries = true)
   public ChannelDto update(UUID channelId, PublicChannelUpdateRequest request) {
     log.debug("채널 수정 시작: id={}, request={}", channelId, request);
     String newName = request.newName();
@@ -113,7 +113,7 @@ public class BasicChannelService implements ChannelService {
   @Transactional
   @Override
   @PreAuthorize("hasRole('CHANNEL_MANAGER')")
-  @CacheEvict(cacheNames = "channelsByUser", allEntries = true)
+  @CacheEvict(cacheNames = "channels", allEntries = true)
   public void delete(UUID channelId) {
     log.debug("채널 삭제 시작: id={}", channelId);
     if (!channelRepository.existsById(channelId)) {

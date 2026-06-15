@@ -50,7 +50,7 @@ public class BasicMessageService implements MessageService {
 
   @Transactional
   @Override
-  @CacheEvict(cacheNames = "channelsByUser", allEntries = true)
+  @CacheEvict(cacheNames = "channels", allEntries = true)
   public MessageDto create(MessageCreateRequest messageCreateRequest,
       List<BinaryContentCreateRequest> binaryContentCreateRequests) {
     log.debug("메시지 생성 시작: request={}", messageCreateRequest);
